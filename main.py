@@ -6,18 +6,18 @@
 
 # Press the green button in the gutter to run the script.
 from core.util import i18n
-from dao.tipoclientedao import TipoClienteDao
 from core.exception.exceptionhandler import CustomException
 from model.tipocliente import TipoCliente
+from service.tipoclienteservice import TipoClienteService
 
 if __name__ == '__main__':
     i18n.change_locale("es_ES")
 
     tipocliente = TipoCliente(None, "0003", "Contado")
-    tipoclienteDao = TipoClienteDao()
+    tipoclienteService = TipoClienteService()
 
     try:
-        tipoclienteDao.insert(tipocliente)
+        tipoclienteService.insert(tipocliente)
         print(f'Se ha insertado {str(tipocliente)}')
     except CustomException as e:
         print(str(e))

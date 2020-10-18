@@ -2,7 +2,7 @@ from typing import Generic, TypeVar
 
 import pymysql as pymysql
 
-from core.decometa.decometa import DecoMetaExceptions
+from core.exception.decometaexceptions import DecoMetaExceptions
 from core.exception.exceptionhandler import CustomException
 
 from core.util import i18n, resourceutils
