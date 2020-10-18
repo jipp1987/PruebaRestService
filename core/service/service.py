@@ -18,6 +18,37 @@ class BaseService(Generic[T]):
         # Tienen un dao asociado
         self._dao = dao
 
+    def begin_transaction(self, function, *args, **kwargs):
+        """
+        Envuelve la función dentro de un contexto transaccional: se hace commit al final si no hay problemas,
+        y si sucede algo se hace rollback.
+        :param function: Función miembro a ejecutar. Se accede a ella poniendo primero su nombre prececido de punto
+        y el nombre del objeto al que pertenece
+        :param args: Argumentos de la función.
+        :param kwargs: Argumentos de la función que se han pasado por teclado.
+        :return: Resultado de la función
+        """
+        try:
+            # Conectar
+            self._dao.connect()
+            result = function(*args, **kwargs)
+            # Consignar operación
+            self._dao.commit()
+            return result
+        except Exception:
+            # Rollback si hay error
+            self._dao.rollback()
+            raise
+        finally:
+            # Desconectar siempre al final
+            self._dao.disconnect()
+
+
     def insert(self, entity: T):
         """Insertar registros."""
         self._dao.insert(entity)
+        self.delete_entity(entity)
+
+    def delete_entity(self, entity: T):
+        """Eliminar registros."""
+        self._dao.delete_entity(entity)

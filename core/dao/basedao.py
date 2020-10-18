@@ -29,17 +29,16 @@ class BaseDao(Generic[T], metaclass=DecoMetaExceptions):
     # Funciones
     def connect(self):
         """Conectarse a la base de datos."""
-        self._db = pymysql.connect(self.__host, self.__username, self.__password, self.__dbname)
-        # desactivar autocommit, las transacciones se manejan mejor manualmente
-        self._db.autocommit = False
+        if self._db is None or self._db.open is False:
+            self._db = pymysql.connect(self.__host, self.__username, self.__password, self.__dbname)
+            # desactivar autocommit, las transacciones se manejan mejor manualmente
+            self._db.autocommit = False
 
     def disconnect(self):
         """Desconectar de la base de datos."""
         if self._db is not None and self._db.open:
             self._db.close()
             self._db = None
-        else:
-            raise CustomException(i18n.translate("i18n_base_commonError_database_connection"))
 
     def commit(self):
         """Hace commit."""
@@ -57,34 +56,31 @@ class BaseDao(Generic[T], metaclass=DecoMetaExceptions):
 
     def execute_query(self, sql):
         """Crea un cursor y ejecuta una query."""
-        cursor = None
         if self._db is not None and self._db.open:
             # Crear cursor
             cursor = self._db.cursor()
             # Ejecutar query
-            cursor.execute(sql)
-            # Cerrar cursor
-            cursor.close()
+            try:
+                cursor.execute(sql)
+            except pymysql.Error:
+                raise
+            finally:
+                # Cerrar cursor
+                cursor.close()
         else:
             raise CustomException(i18n.translate("i18n_base_commonError_database_connection"))
 
     def insert(self, entity: T):
         """Insertar registros."""
-        try:
-            sql = f"insert into {self.__table} ({entity.get_field_names_as_str()}) " \
-                  f"values ({entity.get_field_values_as_str()}) "
+        # Ejecutar query
+        sql = f"insert into {self.__table} ({entity.get_field_names_as_str()}) " \
+              f"values ({entity.get_field_values_as_str()}) "
+        self.execute_query(sql)
 
-            # Conectar
-            self.connect()
-            # Ejecutar query
-            self.execute_query(sql)
-            # Consignar operación
-            self.commit()
-        except pymysql.Error:
-            # Rollback si hay error
-            self.rollback()
-            # La metaclase ya se ocupa de tratar la excepción, el mensaje, tipo, archivo, etc.
-            raise
-        finally:
-            # Desconectar siempre al final
-            self.disconnect()
+    def delete_entity(self, entity: T):
+        """
+        Elimina una entidad de la base de datos.
+        :param entity: Entidad a eliminar.
+        """
+        sql = f"delete from {self.table} where {entity.idfieldname} = {getattr(entity, entity.idfieldname)}"
+        self.execute_query(sql)

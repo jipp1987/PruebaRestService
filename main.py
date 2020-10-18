@@ -13,11 +13,11 @@ from service.tipoclienteservice import TipoClienteService
 if __name__ == '__main__':
     i18n.change_locale("es_ES")
 
-    tipocliente = TipoCliente(None, "0003", "Contado")
+    tipocliente = TipoCliente(None, "0005", "asas")
     tipoclienteService = TipoClienteService()
 
     try:
-        tipoclienteService.insert(tipocliente)
+        tipoclienteService.begin_transaction(tipoclienteService.insert, tipocliente)
         print(f'Se ha insertado {str(tipocliente)}')
     except CustomException as e:
         print(str(e))
