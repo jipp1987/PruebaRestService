@@ -43,11 +43,9 @@ class BaseService(Generic[T]):
             # Desconectar siempre al final
             self._dao.disconnect()
 
-
     def insert(self, entity: T):
         """Insertar registros."""
         self._dao.insert(entity)
-        self.delete_entity(entity)
 
     def delete_entity(self, entity: T):
         """Eliminar registros."""

@@ -62,11 +62,11 @@ class BaseDao(Generic[T], metaclass=DecoMetaExceptions):
             # Ejecutar query
             try:
                 cursor.execute(sql)
+                return cursor
             except pymysql.Error:
+                if cursor is not None:
+                    cursor.close()
                 raise
-            finally:
-                # Cerrar cursor
-                cursor.close()
         else:
             raise CustomException(i18n.translate("i18n_base_commonError_database_connection"))
 
@@ -75,12 +75,18 @@ class BaseDao(Generic[T], metaclass=DecoMetaExceptions):
         # Ejecutar query
         sql = f"insert into {self.__table} ({entity.get_field_names_as_str()}) " \
               f"values ({entity.get_field_values_as_str()}) "
-        self.execute_query(sql)
+        cursor = self.execute_query(sql)
+        # A través del cursor, le setteo a la entidad el id asignado en la base de datos
+        setattr(entity, entity.idfieldname, cursor.lastrowid)
+        # cerrar cursor
+        cursor.close()
 
     def delete_entity(self, entity: T):
         """
         Elimina una entidad de la base de datos.
         :param entity: Entidad a eliminar.
         """
-        sql = f"delete from {self.table} where {entity.idfieldname} = {getattr(entity, entity.idfieldname)}"
-        self.execute_query(sql)
+        sql = f"delete from {self.__table} where {entity.idfieldname} = {getattr(entity, entity.idfieldname)}"
+        cursor = self.execute_query(sql)
+        # cerrar cursor
+        cursor.close()

@@ -13,7 +13,7 @@ from service.tipoclienteservice import TipoClienteService
 if __name__ == '__main__':
     i18n.change_locale("es_ES")
 
-    tipocliente = TipoCliente(None, "0005", "asas")
+    tipocliente = TipoCliente(None, "0006", "qqqq")
     tipoclienteService = TipoClienteService()
 
     try:
