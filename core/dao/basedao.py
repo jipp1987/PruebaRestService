@@ -2,7 +2,6 @@ from typing import Generic, TypeVar
 
 import pymysql as pymysql
 
-from core.exception.decometaexceptions import DecoMetaExceptions
 from core.exception.exceptionhandler import CustomException
 
 from core.util import i18n, resourceutils
@@ -13,7 +12,7 @@ T = TypeVar("T", bound=BaseEntity)
 """Clase genérica que herede de BaseEntity, que son las entidades persistidas en la base de datos."""
 
 
-class BaseDao(Generic[T], metaclass=DecoMetaExceptions):
+class BaseDao(Generic[T]):
     """Dao genérico."""
 
     # Constructor
@@ -86,7 +85,7 @@ class BaseDao(Generic[T], metaclass=DecoMetaExceptions):
         Elimina una entidad de la base de datos.
         :param entity: Entidad a eliminar.
         """
-        sql = f"delete from {self.__table} where {entity.idfieldname} = {getattr(entity, entity.idfieldname)}"
+        sql = f"delete from {self.__table} where id = {getattr(entity, entity.idfieldname)}"
         cursor = self.execute_query(sql)
         # cerrar cursor
         cursor.close()

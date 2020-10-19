@@ -1,6 +1,7 @@
 from typing import TypeVar, Generic
 
 from core.dao.basedao import BaseDao
+from core.exception.decometaexceptions import DecoMetaExceptions
 from core.model.BaseEntity import BaseEntity
 
 T = TypeVar("T", bound=BaseEntity)
@@ -9,7 +10,7 @@ DAO = TypeVar("DAO", bound=BaseDao[T])
 """Implementación de BaseDao que utilice la entidad base"""
 
 
-class BaseService(Generic[T]):
+class BaseService(Generic[T], metaclass=DecoMetaExceptions):
     """
     Clase genérica de la que han de heredar el resto de servicios del programa.
     """
@@ -18,7 +19,7 @@ class BaseService(Generic[T]):
         # Tienen un dao asociado
         self._dao = dao
 
-    def begin_transaction(self, function, *args, **kwargs):
+    def start_transaction(self, function, *args, **kwargs):
         """
         Envuelve la función dentro de un contexto transaccional: se hace commit al final si no hay problemas,
         y si sucede algo se hace rollback.

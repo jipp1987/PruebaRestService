@@ -1,16 +1,18 @@
 # Modelo para tabla clientes
+from core.model.BaseEntity import BaseEntity
 from model.tipocliente import TipoCliente
 
 
-class Cliente:
+class Cliente(BaseEntity):
     """Modelo de cliente."""
 
     # clienteid -> id (no puedo usar el mismo nombre de campo, id es una función interna de python y no se recomienda)
     # llamar a variables de la misma forma
 
     # Constructor
-    def __init__(self, clienteid=None, codigo=None, nombre=None, apellidos=None, saldo=None):
-        self.clienteid = clienteid
+    def __init__(self, dbid=None, codigo=None, nombre=None, apellidos=None, saldo=None):
+        super().__init__()
+        self.id = dbid
         self.codigo = codigo
         self.nombre = nombre
         self.apellidos = apellidos
@@ -24,7 +26,7 @@ class Cliente:
             # El id es el campo que me dice si es el mismo
             # Hay una función interna, __dict__, que serían todos los atributos modificables del objeto,
             # pero en este caso al ser un modelo de la base de datos me quedo con el id
-            return self.clienteid == other.clienteid
+            return self.id == other.id
         else:
             return False
 
@@ -40,11 +42,11 @@ class Cliente:
     # conjunto como un diccionario, set... no puede cambiar su valor clave que se emplea en el hash
     def __hash__(self):
         # En este caso uso el mismo atributo que para el hash
-        return hash(self.clienteid)
+        return hash(self.id)
 
     # función para representar como string el objeto
     def __repr__(self):
         # esto es una nueva forma en python3 de dar formato a un string, es mejor esto que concatenar cadenas,
         # sobretodo porque si le intentamos concatenar a una cadena un campo no string lanzará error durante
         # la ejecución
-        return f'id = {self.clienteid}, codigo = {self.codigo}, (tipo de cliente = {self.tipocliente})'
+        return f'id = {self.id}, codigo = {self.codigo}, (tipo de cliente = {self.tipocliente})'
