@@ -1,5 +1,6 @@
 import sys
 import traceback
+import types
 from functools import wraps
 
 from core.util import i18n
@@ -92,3 +93,20 @@ def catch_exceptions(function):
             raise CustomException(message, exc_instance, exc_type.__name__, error_line)
 
     return decorator
+
+
+class BugBarrier(type):
+    """Metaclase para añadir a funciones de clases una barrera de errores."""
+
+    def __new__(mcs, name, bases, attrs):
+        # Recorrer atributos de la clase, buscando aquéllos que sean funciones para asignarles un decorador
+        # dinámicamente
+        for attr_name, attr_value in attrs.items():
+            # si es una función, le añado el decorador
+            if isinstance(attr_value, types.FunctionType):
+                # descarto las funciones heredadas de object, que empiezan y acaban en "__"
+                if callable(attr_value) and not attr_name.startswith("__"):
+                    # A la función le añado el decorador catch_exceptions
+                    attrs[attr_name] = catch_exceptions(attr_value)
+
+        return super(BugBarrier, mcs).__new__(mcs, name, bases, attrs)

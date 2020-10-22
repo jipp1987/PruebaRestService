@@ -5,6 +5,7 @@
 
 
 # Press the green button in the gutter to run the script.
+from core.service.service import ServiceFactory
 from core.util import i18n
 from core.exception.exceptionhandler import CustomException
 from model.tipocliente import TipoCliente
@@ -14,7 +15,7 @@ if __name__ == '__main__':
     i18n.change_locale("es_ES")
 
     tipocliente = TipoCliente(None, "0005", "Contado")
-    tipoclienteService = TipoClienteService()
+    tipoclienteService = ServiceFactory.get_service(TipoClienteService)
 
     try:
         tipoclienteService.start_transaction(tipoclienteService.insert, tipocliente)
