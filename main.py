@@ -3,6 +3,7 @@ from flask import Flask, request
 # Defino la app de Flask a partir del nombre del este módulo. Es la representación de la aplicación web.
 from core.exception.exceptionhandler import CustomException
 from core.service.service import ServiceFactory
+from core.util import i18n
 from model.tipocliente import TipoCliente
 from service.tipoclienteservice import TipoClienteService
 
@@ -25,10 +26,13 @@ def insert_tipo_cliente():
         # Inserto el tipo de cliente
         tipo_cliente = TipoCliente(None, codigo, descripcion)
         tipo_cliente_service = ServiceFactory.get_service(TipoClienteService)
-        tipo_cliente_service.insert(tipo_cliente)
-        return '''<h1>Se ha insertado: {}</h1>'''.format(str(tipo_cliente))
+
+        # Importante llamar la función dentro de una transacción
+        tipo_cliente_service.start_transaction(tipo_cliente_service.insert, tipo_cliente)
+
+        return i18n.translate("i18n_base_common_insert_success", None, *[str(tipo_cliente)])
     except CustomException as e:
-        return f'Se ha producido un error insertando el registro: {str(e)}'
+        return i18n.translate("i18n_base_commonError_request", None, *[e.known_error])
 
 
 if __name__ == "__main__":

@@ -6,13 +6,14 @@ from functools import wraps
 from core.util import i18n
 
 _known_error_types = [("IntegrityError", "i18n_base_knownError_integrityError")]
-"""Errores conocidos y su mensaje conocido asociado"""
+"""Errores conocidos y su clave i18n de error conocido, es lo que se intenta mostrar al usuario."""
 
 
 class CustomException(Exception):
     """Excepción personalizada, a modo de barrera de fallos para intepretar las excepciones y no perder su
     información.
     """
+
 
     # Constructor
     def __init__(self, message, exception: Exception = None, exception_type=None, line=None):
@@ -37,7 +38,9 @@ class CustomException(Exception):
         string = None
         if self.exception_type is not None:
             for pair_values in _known_error_types:
+                # El tipo de excepción es la clave del diccionario
                 if self.exception_type == pair_values[0]:
+                    # Esto es el valor, que es una clave i18n y es el error conocido
                     string = i18n.translate(pair_values[1])
                     break
 
