@@ -6,7 +6,7 @@ from core.exception.exceptionhandler import CustomException
 
 from core.util import i18n, resourceutils
 
-from core.model.BaseEntity import BaseEntity
+from core.model.baseentity import BaseEntity
 
 T = TypeVar("T", bound=BaseEntity)
 """Clase genérica que herede de BaseEntity, que son las entidades persistidas en la base de datos."""

@@ -1,5 +1,5 @@
 # Modelo para tabla clientes
-from core.model.BaseEntity import BaseEntity
+from core.model.baseentity import BaseEntity
 from model.tipocliente import TipoCliente
 
 

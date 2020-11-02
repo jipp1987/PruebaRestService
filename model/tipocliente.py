@@ -1,4 +1,4 @@
-from core.model.BaseEntity import BaseEntity
+from core.model.baseentity import BaseEntity
 
 
 class TipoCliente(BaseEntity):
