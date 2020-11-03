@@ -2,7 +2,6 @@ import abc
 import enum
 import json
 from functools import wraps
-from types import SimpleNamespace
 
 import flask_restful
 from werkzeug.local import LocalProxy
@@ -29,7 +28,8 @@ class RequestActions(enum.Enum):
 class RequestBody:
     """Objeto de cuerpo de Request."""
 
-    def __init__(self, username: str, password: str, action: int, request_object: any):
+    def __init__(self, username: str = None, password: str = None, action: int = None,
+                 request_object: any = None):
         super().__init__()
         self.username = username
         self.password = password
@@ -59,6 +59,16 @@ def authenticate(func):
     return wrapper
 
 
+def convert_request_to_request_body(request: LocalProxy):
+    """Convierte un json a un RequestBody"""
+    # get_json devuelve un diccionario. Lo convierto a formato json para poder convertirlo a objeto
+    json_format = json.dumps(request.get_json(), ensure_ascii=False)
+    # lo convierto a diccionario
+    json_dict = json.loads(json_format)
+    # deserializo el diccionario en el objeto deseado
+    return RequestBody(**json_dict)
+
+
 class CustomResource(flask_restful.Resource):
     __metaclass__ = makecls(abc.ABCMeta)
 
@@ -69,13 +79,6 @@ class CustomResource(flask_restful.Resource):
     # Lo que hago es forzar que todas las funciones de las clases que hereden de CustomResource pasen por una
     # autenticación.
     method_decorators = [authenticate]
-
-    def _convert_request_to_request_body(self, request: LocalProxy):
-        """Convierte un json a un RequestBody"""
-        # get_json del objeto request me devuelve un diccionario, pero para que me funcione la conversión
-        # de json al objeto que quiero tengo que ser un string en el que además las comillas simples se sustituyan
-        # por comillas dobles.
-        return json.loads(str(request.get_json()).replace("'", '"'), object_hook=lambda d: SimpleNamespace(**d))
 
     @abc.abstractmethod
     def _create_with_response(self, request_object: any):

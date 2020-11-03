@@ -1,10 +1,8 @@
-import json
-from types import SimpleNamespace
-
 from flask import request
 
 from core.exception.exceptionhandler import CustomException
-from core.rest.restcontroller import CustomResource, RequestActions
+from core.rest.restcontroller import CustomResource, RequestActions, \
+    convert_request_to_request_body
 from core.service.service import ServiceFactory
 from core.util import i18n
 from model.tipocliente import TipoCliente
@@ -36,7 +34,7 @@ class TipoClienteRestController(CustomResource):
         :return: Cadena con mensaje formateado para devolver al solicitante.
         """
         # Obtengo datos json de la petición
-        request_body = self._convert_request_to_request_body(request)
+        request_body = convert_request_to_request_body(request)
 
         try:
             result = None
@@ -45,7 +43,8 @@ class TipoClienteRestController(CustomResource):
             request_action = RequestActions(request_body.action)
 
             if request_action == RequestActions.CREATE:
-                tipo_cliente = request_body.request_object
+                # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
+                tipo_cliente = TipoCliente(**request_body.request_object)
                 self._create_with_response(tipo_cliente)
                 result = i18n.translate("i18n_base_common_insert_success", None, *[str(tipo_cliente)])
 

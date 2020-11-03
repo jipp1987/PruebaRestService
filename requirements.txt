@@ -3,3 +3,4 @@ jproperties~=2.1.0
 Flask~=1.1.2
 flask_restful==0.3.8
 flask_jsonpify==1.5.0
+Werkzeug~=1.0.1
