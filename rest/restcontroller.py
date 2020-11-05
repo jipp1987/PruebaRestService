@@ -1,8 +1,9 @@
+import jsonpickle
 from flask import request
 
-from core.exception.exceptionhandler import CustomException
-from core.rest.restcontroller import CustomResource, RequestActions, \
-    convert_request_to_request_body
+from core.exception.exceptionhandler import ServiceException
+from core.rest.restcontroller import RestController, PostRequestActions, convert_request_to_request_body, \
+    RequestResponse
 from core.service.service import ServiceFactory
 from core.util import i18n
 from model.tipocliente import TipoCliente
@@ -10,7 +11,7 @@ from service.tipoclienteservice import TipoClienteService
 
 
 # Hereda de Resource de flask_restful
-class TipoClienteRestController(CustomResource):
+class TipoClienteRestController(RestController):
     """Rest controller para tipos de cliente."""
 
     def _create_with_response(self, tipo_cliente: TipoCliente):
@@ -19,7 +20,7 @@ class TipoClienteRestController(CustomResource):
             tipo_cliente_service = ServiceFactory.get_service(TipoClienteService)
             # Importante llamar la función dentro de una transacción
             tipo_cliente_service.start_transaction(tipo_cliente_service.insert, tipo_cliente)
-        except CustomException as e:
+        except ServiceException as e:
             raise e
 
     def _delete_with_response(self, tipo_cliente: TipoCliente):
@@ -40,14 +41,21 @@ class TipoClienteRestController(CustomResource):
             result = None
 
             # Comprobar la acción enviada en la Request
-            request_action = RequestActions(request_body.action)
+            request_action = PostRequestActions(request_body.action)
 
-            if request_action == RequestActions.CREATE:
+            if request_action == PostRequestActions.CREATE:
                 # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
                 tipo_cliente = TipoCliente(**request_body.request_object)
                 self._create_with_response(tipo_cliente)
                 result = i18n.translate("i18n_base_common_insert_success", None, *[str(tipo_cliente)])
 
-            return result
-        except CustomException as e:
-            return i18n.translate("i18n_base_commonError_request", None, *[e.known_error])
+            # Devuelvo una respuesta correcta
+            response = RequestResponse(result, True, 200)
+            return jsonpickle.encode(response, unpicklable=False)
+        except ServiceException as e:
+            result = i18n.translate("i18n_base_commonError_request", None, *[e.known_error])
+            response = RequestResponse(result, False, 400)
+
+            jsonpickle.set_preferred_backend('json')
+            jsonpickle.set_encoder_options('json', ensure_ascii=False)
+            return jsonpickle.encode(response, unpicklable=False)

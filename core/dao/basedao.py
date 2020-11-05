@@ -2,7 +2,7 @@ from typing import Generic, TypeVar
 
 import pymysql as pymysql
 
-from core.exception.exceptionhandler import CustomException
+from core.exception.exceptionhandler import ServiceException
 
 from core.util import i18n, resourceutils
 
@@ -44,14 +44,14 @@ class BaseDao(Generic[T]):
         if self._db is not None and self._db.open:
             self._db.commit()
         else:
-            raise CustomException(i18n.translate("i18n_base_commonError_database_connection"))
+            raise ServiceException(i18n.translate("i18n_base_commonError_database_connection"))
 
     def rollback(self):
         """Hace rollback."""
         if self._db is not None and self._db.open:
             self._db.rollback()
         else:
-            raise CustomException(i18n.translate("i18n_base_commonError_database_connection"))
+            raise ServiceException(i18n.translate("i18n_base_commonError_database_connection"))
 
     def execute_query(self, sql):
         """Crea un cursor y ejecuta una query."""
@@ -67,7 +67,7 @@ class BaseDao(Generic[T]):
                     cursor.close()
                 raise
         else:
-            raise CustomException(i18n.translate("i18n_base_commonError_database_connection"))
+            raise ServiceException(i18n.translate("i18n_base_commonError_database_connection"))
 
     def insert(self, entity: T):
         """Insertar registros."""

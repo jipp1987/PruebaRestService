@@ -9,8 +9,8 @@ from werkzeug.local import LocalProxy
 from core.util.noconflict import makecls
 
 
-class RequestActions(enum.Enum):
-    """Enumerado de acciones de peticiones."""
+class PostRequestActions(enum.Enum):
+    """Enumerado de acciones de peticiones POST."""
 
     CREATE = 1
     """Crear entidad"""
@@ -20,9 +20,6 @@ class RequestActions(enum.Enum):
 
     DELETE = 3
     """Borrar entidad"""
-
-    SELECT = 4
-    """Seleccionar con filtros"""
 
 
 class RequestBody:
@@ -35,6 +32,17 @@ class RequestBody:
         self.password = password
         self.action = action
         self.request_object = request_object
+
+
+class RequestResponse:
+    """Objeto de respuesta de request."""
+
+    def __init__(self, message: str, success: bool, error_code: int = None, response_object: any = None):
+        super().__init__()
+        self.message = message
+        self.success = success
+        self.error_code = error_code
+        self.response_object = response_object
 
 
 def authenticate(func):
@@ -61,19 +69,29 @@ def authenticate(func):
 
 def convert_request_to_request_body(request: LocalProxy):
     """Convierte un json a un RequestBody"""
+
     # get_json devuelve un diccionario. Lo convierto a formato json para poder convertirlo a objeto
     json_format = json.dumps(request.get_json(), ensure_ascii=False)
+
     # lo convierto a diccionario
     json_dict = json.loads(json_format)
+
     # deserializo el diccionario en el objeto deseado
-    return RequestBody(**json_dict)
+    request_body = RequestBody(**json_dict)
+
+    return request_body
 
 
-class CustomResource(flask_restful.Resource):
-    __metaclass__ = makecls(abc.ABCMeta)
-
+class RestController(flask_restful.Resource):
     """Implementación de los Resource de flask_restful. Los recursos de la aplicación deberán heredar de esta clase.
     Es una clase abstracta, por eso su metaclase es ABCMeta. """
+
+    # Esta clase hereda de Rousource de flask_restful, una clase que tiene definida su propia metaclase. Además,
+    # quiero que en el core sea abstracta por lo que tiene que tener la metaclase abc.ABCMeta. Sucede que Python no es
+    # capaz por sí mismo de decidir cuál de las dos metaclases es la principal, por lo que uso una utilidad que genera
+    # una metaclase a partir de las clases de las que herede la clase principal, o bien directamente le paso como
+    # parámetro una metaclase (como es este caso) con la que quiero mezclar.
+    __metaclass__ = makecls(abc.ABCMeta)
 
     # Resource de flask_restful tiene esta propiedad que son los decoradores de las funciones.
     # Lo que hago es forzar que todas las funciones de las clases que hereden de CustomResource pasen por una
