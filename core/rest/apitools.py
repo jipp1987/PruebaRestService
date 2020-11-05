@@ -4,12 +4,13 @@ import json
 from functools import wraps
 
 import flask_restful
+import jsonpickle
 from werkzeug.local import LocalProxy
 
 from core.util.noconflict import makecls
 
 
-class PostRequestActions(enum.Enum):
+class EnumPostRequestActions(enum.Enum):
     """Enumerado de acciones de peticiones POST."""
 
     CREATE = 1
@@ -20,6 +21,37 @@ class PostRequestActions(enum.Enum):
 
     DELETE = 3
     """Borrar entidad"""
+
+
+class EnumHttpResponseStatusCodes(enum.Enum):
+    """Enumerado de códigos de estado para respuestas de peticiones Http."""
+
+    OK = 200
+    """OK."""
+
+    CREATED = 201
+    """Creado."""
+
+    BAD_REQUEST = 400
+    """Algún error en los datos enviados para realizar la petición."""
+
+    UNAUTHORIZED = 401
+    """Sin autorización."""
+
+    FORBIDDEN = 403
+    """Prohibido."""
+
+    NOT_FOUND = 404
+    """Recurso no encontrado."""
+
+    METHOD_NOT_FOUND = 405
+    """Método no encontrado."""
+
+    REQUEST_TIMEOUT = 408
+    """Tiempo para ejecutar la petición consumido."""
+
+    SERVER_ERROR = 500
+    """Error de servidor."""
 
 
 class RequestBody:
@@ -37,11 +69,11 @@ class RequestBody:
 class RequestResponse:
     """Objeto de respuesta de request."""
 
-    def __init__(self, message: str, success: bool, error_code: int = None, response_object: any = None):
+    def __init__(self, message: str, success: bool, status_code: int = None, response_object: any = None):
         super().__init__()
         self.message = message
         self.success = success
-        self.error_code = error_code
+        self.status_code = status_code
         self.response_object = response_object
 
 
@@ -62,13 +94,28 @@ def authenticate(func):
         if acct:
             return func(*args, **kwargs)
 
-        flask_restful.abort(401)
+        flask_restful.abort(EnumHttpResponseStatusCodes.UNAUTHORIZED.value)
 
     return wrapper
 
 
+def encode_object_to_json(object_to_encode: any):
+    """
+    Serializa un objeto en json. Usa la librería jsonpickle.
+    :param object_to_encode: Objeto a codificar en json.
+    :return: json
+    """
+    jsonpickle.set_preferred_backend('json')
+    jsonpickle.set_encoder_options('json', ensure_ascii=False)
+    return jsonpickle.encode(object_to_encode, unpicklable=False)
+
+
 def convert_request_to_request_body(request: LocalProxy):
-    """Convierte un json a un RequestBody"""
+    """
+    Convierte el get_json de un LocalProxy a un RequestBody.
+    :param request:
+    :return: RequestBody
+    """
 
     # get_json devuelve un diccionario. Lo convierto a formato json para poder convertirlo a objeto
     json_format = json.dumps(request.get_json(), ensure_ascii=False)

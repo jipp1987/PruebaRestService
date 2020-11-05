@@ -1,9 +1,8 @@
-import jsonpickle
-from flask import request
+from flask import request, make_response
 
 from core.exception.exceptionhandler import ServiceException
-from core.rest.restcontroller import RestController, PostRequestActions, convert_request_to_request_body, \
-    RequestResponse
+from core.rest.apitools import RestController, EnumPostRequestActions, convert_request_to_request_body, \
+    RequestResponse, encode_object_to_json, EnumHttpResponseStatusCodes
 from core.service.service import ServiceFactory
 from core.util import i18n
 from model.tipocliente import TipoCliente
@@ -41,21 +40,19 @@ class TipoClienteRestController(RestController):
             result = None
 
             # Comprobar la acción enviada en la Request
-            request_action = PostRequestActions(request_body.action)
+            request_action = EnumPostRequestActions(request_body.action)
 
-            if request_action == PostRequestActions.CREATE:
+            if request_action == EnumPostRequestActions.CREATE:
                 # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
                 tipo_cliente = TipoCliente(**request_body.request_object)
                 self._create_with_response(tipo_cliente)
                 result = i18n.translate("i18n_base_common_insert_success", None, *[str(tipo_cliente)])
 
             # Devuelvo una respuesta correcta
-            response = RequestResponse(result, True, 200)
-            return jsonpickle.encode(response, unpicklable=False)
+            response_body = RequestResponse(result, success=True, status_code=EnumHttpResponseStatusCodes.OK.value)
+            return make_response(encode_object_to_json(response_body), response_body.status_code)
         except ServiceException as e:
             result = i18n.translate("i18n_base_commonError_request", None, *[e.known_error])
-            response = RequestResponse(result, False, 400)
-
-            jsonpickle.set_preferred_backend('json')
-            jsonpickle.set_encoder_options('json', ensure_ascii=False)
-            return jsonpickle.encode(response, unpicklable=False)
+            response_body = RequestResponse(result, success=False,
+                                            status_code=EnumHttpResponseStatusCodes.BAD_REQUEST.value)
+            return make_response(encode_object_to_json(response_body), response_body.status_code)
