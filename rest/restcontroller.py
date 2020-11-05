@@ -1,7 +1,7 @@
 from flask import request, make_response
 
 from core.exception.exceptionhandler import ServiceException
-from core.rest.apitools import RestController, EnumPostRequestActions, convert_request_to_request_body, \
+from core.rest.apitools import RestController, EnumPostRequestActions, \
     RequestResponse, encode_object_to_json, EnumHttpResponseStatusCodes
 from core.service.service import ServiceFactory
 from core.util import i18n
@@ -34,7 +34,7 @@ class TipoClienteRestController(RestController):
         :return: Cadena con mensaje formateado para devolver al solicitante.
         """
         # Obtengo datos json de la petición
-        request_body = convert_request_to_request_body(request)
+        request_body = self._convert_request_to_request_body(request)
 
         try:
             result = None
