@@ -66,6 +66,11 @@ class RestController(flask_restful.Resource):
         """Método para actualizar una entidad devolviendo una respuesta."""
         pass
 
+    @abc.abstractmethod
+    def _select_with_response(self, request_object: dict):
+        """Método para seleccionar datos de una tabla."""
+        pass
+
     @staticmethod
     def _convert_request_to_request_body(request_local_proxy: LocalProxy):
         """
@@ -95,6 +100,28 @@ class RestController(flask_restful.Resource):
         """
         return make_response(encode_object_to_json(response_body), response_body.status_code)
 
+    def _resolve_action(self, request_body: RequestBody):
+        """
+        Resuelve la acción a realizar a través del objeto RequestBody. En una función protected. Por defecto hará
+        acciones de crear, borrar, actualizar o listar. Si un restcontroller no realiza alguna de estas funciones,
+        lo mejor que es sobresciba esta función y realice la acción que considere.
+        :param request_body: Objeto de cuerpo de request.
+        :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
+        """
+        # Comprobar la acción enviada en la Request
+        request_action = EnumPostRequestActions(request_body.action)
+
+        if request_action == EnumPostRequestActions.CREATE:
+            result = self._create_with_response(request_body.request_object)
+        elif request_action == EnumPostRequestActions.DELETE:
+            result = self._delete_with_response(request_body.request_object)
+        elif request_action == EnumPostRequestActions.UPDATE:
+            result = self._update_with_response(request_body.request_object)
+        else:
+            result = self._select_with_response(request_body.request_object)
+
+        return result
+
     def post(self):
         """
         Método post de controller rest de tipos de cliente.
@@ -104,13 +131,8 @@ class RestController(flask_restful.Resource):
         request_body = self._convert_request_to_request_body(request)
 
         try:
-            result = None
-
             # Comprobar la acción enviada en la Request
-            request_action = EnumPostRequestActions(request_body.action)
-
-            if request_action == EnumPostRequestActions.CREATE:
-                result = self._create_with_response(request_body.request_object)
+            result = self._resolve_action(request_body)
 
             # Devuelvo una respuesta correcta
             response_body = RequestResponse(result, success=True, status_code=EnumHttpResponseStatusCodes.OK.value)

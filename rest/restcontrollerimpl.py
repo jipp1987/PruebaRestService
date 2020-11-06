@@ -28,3 +28,6 @@ class TipoClienteRestController(RestController):
 
     def _update_with_response(self, request_object: dict):
         pass
+
+    def _select_with_response(self, request_object: dict):
+        pass

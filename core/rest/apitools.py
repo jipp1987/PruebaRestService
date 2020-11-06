@@ -24,6 +24,9 @@ class EnumPostRequestActions(enum.Enum):
     DELETE = 3
     """Borrar entidad"""
 
+    SELECT = 4
+    """Seleccionar de una tabla."""
+
 
 class EnumHttpResponseStatusCodes(enum.Enum):
     """Enumerado de códigos de estado para respuestas de peticiones Http."""
