@@ -5,7 +5,6 @@ JSON, códigos de estado http...
 """
 
 import enum
-from functools import wraps
 from typing import List, Tuple
 
 import flask_restful
@@ -78,28 +77,6 @@ class RequestResponse:
         self.success = success
         self.status_code = status_code
         self.response_object = response_object
-
-
-def authenticate(func):
-    """Decorator para forzar la autenticación de cualquier llamada de API rest."""
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        # Comprueba si la función tiene el atributo authenticated, devolviendo True en caso de que no exista
-        # Si existe, la función se ejecuta directamente porque ya está autenticada.
-        if not getattr(func, 'authenticated', True):
-            return func(*args, **kwargs)
-
-        # TODO Implementar autenticación
-        # acct = basic_authentication()
-        acct = True
-
-        if acct:
-            return func(*args, **kwargs)
-
-        flask_restful.abort(EnumHttpResponseStatusCodes.UNAUTHORIZED.value)
-
-    return wrapper
 
 
 def encode_object_to_json(object_to_encode: any):

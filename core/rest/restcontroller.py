@@ -1,5 +1,6 @@
 import abc
 import json
+from functools import wraps
 
 import flask_restful
 from flask import make_response, request
@@ -7,9 +8,31 @@ from werkzeug.local import LocalProxy
 
 from core.exception.exceptionhandler import ServiceException
 from core.rest.apitools import encode_object_to_json, EnumPostRequestActions, RequestResponse, \
-    EnumHttpResponseStatusCodes, authenticate, RequestBody
+    EnumHttpResponseStatusCodes, RequestBody
 from core.util import i18n
 from core.util.noconflict import makecls
+
+
+def authenticate(func):
+    """Decorator para forzar la autenticación de cualquier llamada de API rest."""
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Comprueba si la función tiene el atributo authenticated, devolviendo True en caso de que no exista
+        # Si existe, la función se ejecuta directamente porque ya está autenticada.
+        if not getattr(func, 'authenticated', True):
+            return func(*args, **kwargs)
+
+        # TODO Implementar autenticación
+        # acct = basic_authentication()
+        acct = True
+
+        if acct:
+            return func(*args, **kwargs)
+
+        flask_restful.abort(EnumHttpResponseStatusCodes.UNAUTHORIZED.value)
+
+    return wrapper
 
 
 class RestController(flask_restful.Resource):
