@@ -16,6 +16,12 @@ msgstr ""
 msgid "i18n_base_common_insert_success"
 msgstr "The record '%s' has been inserted successfully."
 
+msgid "i18n_base_common_delete_success"
+msgstr "The record '%s' has been deleted successfully."
+
+msgid "i18n_base_common_update_success"
+msgstr "The record '%s' has been updated successfully."
+
 # Errores
 msgid "i18n_base_knownError_integrityError"
 msgstr "There was an error when entering or modifying the record, it is possible that there is one like it."

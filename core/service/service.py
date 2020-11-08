@@ -1,8 +1,10 @@
+import abc
 from typing import TypeVar, Generic
 
 from core.dao.basedao import BaseDao
 from core.exception.exceptionhandler import BugBarrier
 from core.model.baseentity import BaseEntity
+from core.util.noconflict import makecls
 
 T = TypeVar("T", bound=BaseEntity)
 """Clase genérica que herede de BaseEntity, que son las entidades persistidas en la base de datos."""
@@ -10,10 +12,12 @@ DAO = TypeVar("DAO", bound=BaseDao[T])
 """Implementación de BaseDao que utilice la entidad base"""
 
 
-class BaseService(Generic[T], metaclass=BugBarrier):
+class BaseService(Generic[T]):
     """
-    Clase genérica de la que han de heredar el resto de servicios del programa.
+    Clase abstract de la que han de heredar el resto de servicios del programa.
     """
+    # Llamo a la factoría de metaclases para que me "fusione" las dos metaclases que me interesan.
+    __metaclass__ = makecls(BugBarrier, abc.ABCMeta)
 
     def __init__(self, dao: DAO):
         # Tienen un dao asociado
@@ -47,6 +51,10 @@ class BaseService(Generic[T], metaclass=BugBarrier):
     def insert(self, entity: T):
         """Insertar registros."""
         self._dao.insert(entity)
+
+    def update(self, entity: T):
+        """Actualizar registros."""
+        self._dao.update(entity)
 
     def delete_entity(self, entity: T):
         """Eliminar registros."""

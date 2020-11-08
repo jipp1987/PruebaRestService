@@ -1,3 +1,4 @@
+import abc
 from typing import Generic, TypeVar
 
 import pymysql as pymysql
@@ -14,6 +15,9 @@ T = TypeVar("T", bound=BaseEntity)
 
 class BaseDao(Generic[T]):
     """Dao genérico."""
+
+    __metaclass__ = abc.ABCMeta
+    """Clase abstracta."""
 
     # Constructor
     def __init__(self, table: str):
@@ -77,6 +81,15 @@ class BaseDao(Generic[T]):
         cursor = self.execute_query(sql)
         # A través del cursor, le setteo a la entidad el id asignado en la base de datos
         setattr(entity, entity.idfieldname, cursor.lastrowid)
+        # cerrar cursor
+        cursor.close()
+
+    def update(self, entity: T):
+        """Actualizar registros."""
+        # Ejecutar query
+        sql = f"update {self.__table} set {entity.get_fields_with_value_as_str()} " \
+              f"where id = {getattr(entity, entity.idfieldname)}"
+        cursor = self.execute_query(sql)
         # cerrar cursor
         cursor.close()
 

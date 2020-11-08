@@ -16,6 +16,12 @@ msgstr ""
 msgid "i18n_base_common_insert_success"
 msgstr "El registro '%s' se ha insertado con éxito."
 
+msgid "i18n_base_common_delete_success"
+msgstr "El registro '%s' se ha eliminado con éxito."
+
+msgid "i18n_base_common_update_success"
+msgstr "El registro '%s' se ha actualizado con éxito."
+
 # Errores
 msgid "i18n_base_knownError_integrityError"
 msgstr "Se ha producido un error al introducir o modificar el registro, es posible que exista uno igual."

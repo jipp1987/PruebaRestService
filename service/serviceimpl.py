@@ -1,5 +1,5 @@
 from core.service.service import BaseService
-from dao.tipoclientedao import TipoClienteDao
+from dao.daoimpl import TipoClienteDao
 from model.tipocliente import TipoCliente
 
 

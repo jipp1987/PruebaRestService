@@ -10,9 +10,9 @@ class Cliente(BaseEntity):
     # llamar a variables de la misma forma
 
     # Constructor
-    def __init__(self, dbid=None, codigo=None, nombre=None, apellidos=None, saldo=None):
+    def __init__(self, id=None, codigo=None, nombre=None, apellidos=None, saldo=None):
         super().__init__()
-        self.id = dbid
+        self.id = id
         self.codigo = codigo
         self.nombre = nombre
         self.apellidos = apellidos
