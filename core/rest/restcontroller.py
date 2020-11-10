@@ -1,14 +1,17 @@
 import abc
 import json
 from functools import wraps
+from typing import TypeVar, Generic
 
 import flask_restful
 from flask import make_response, request
 from werkzeug.local import LocalProxy
 
 from core.exception.exceptionhandler import ServiceException
+from core.model.baseentity import BaseEntity
 from core.rest.apitools import encode_object_to_json, EnumPostRequestActions, RequestResponse, \
     EnumHttpResponseStatusCodes, RequestBody
+from core.service.service import BaseService
 from core.util import i18n
 from core.util.noconflict import makecls
 
@@ -35,7 +38,13 @@ def authenticate(func):
     return wrapper
 
 
-class RestController(flask_restful.Resource):
+T = TypeVar("T", bound=BaseEntity)
+"""Clase genérica que herede de BaseEntity, que son las entidades persistidas en la base de datos."""
+SERVICE = TypeVar("SERVICE", bound=BaseService)
+"""Implementación de BaseService que utilice la entidad base"""
+
+
+class RestController(flask_restful.Resource, Generic[T]):
     """Implementación de los Resource de flask_restful. Los recursos de la aplicación deberán heredar de esta clase.
     Es una clase abstracta, por eso su metaclase es ABCMeta. """
 
@@ -52,21 +61,57 @@ class RestController(flask_restful.Resource):
     method_decorators = [authenticate]
 
     @abc.abstractmethod
+    def get_main_service(self) -> SERVICE:
+        """
+        Función a implementar que devuelve un SERVICE a modo de servicio principal.
+        :return: Objeto que herede de BaseService.
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_main_entity_type(self) -> type(T):
+        """
+        Función a implementar que devuelve la clase de la entidad principal.
+        :return: Clase de la entidad principal.
+        """
+        pass
+
     def _create_with_response(self, request_object: dict):
         """Método para crear una entidad devolviendo una respuesta."""
-        pass
+        try:
+            # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
+            entity = self.get_main_entity_type()(**request_object)
+            # Importante llamar la función dentro de una transacción
+            self.get_main_service().start_transaction(self.get_main_service().insert, entity)
 
-    @abc.abstractmethod
+            return i18n.translate("i18n_base_common_insert_success", None, *[str(entity)])
+        except ServiceException as e:
+            raise e
+
     def _delete_with_response(self, request_object: dict):
         """Método para borrar una entidad devolviendo una respuesta."""
-        pass
+        try:
+            # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
+            entity = self.get_main_entity_type()(**request_object)
+            # Importante llamar la función dentro de una transacción
+            self.get_main_service().start_transaction(self.get_main_service().delete_entity, entity)
 
-    @abc.abstractmethod
+            return i18n.translate("i18n_base_common_delete_success", None, *[str(entity)])
+        except ServiceException as e:
+            raise e
+
     def _update_with_response(self, request_object: dict):
         """Método para actualizar una entidad devolviendo una respuesta."""
-        pass
+        try:
+            # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
+            entity = self.get_main_entity_type()(**request_object)
+            # Importante llamar la función dentro de una transacción
+            self.get_main_service().start_transaction(self.get_main_service().update, entity)
 
-    @abc.abstractmethod
+            return i18n.translate("i18n_base_common_update_success", None, *[str(entity)])
+        except ServiceException as e:
+            raise e
+
     def _select_with_response(self, request_object: dict):
         """Método para seleccionar datos de una tabla."""
         pass

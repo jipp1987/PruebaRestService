@@ -8,7 +8,7 @@ from core.util.noconflict import makecls
 
 T = TypeVar("T", bound=BaseEntity)
 """Clase genérica que herede de BaseEntity, que son las entidades persistidas en la base de datos."""
-DAO = TypeVar("DAO", bound=BaseDao[T])
+DAO = TypeVar("DAO", bound=BaseDao)
 """Implementación de BaseDao que utilice la entidad base"""
 
 
