@@ -7,7 +7,7 @@ import flask_restful
 from flask import make_response, request
 from werkzeug.local import LocalProxy
 
-from core.exception.exceptionhandler import ServiceException
+from core.exception.exceptionhandler import CustomException, catch_exceptions
 from core.model.baseentity import BaseEntity
 from core.rest.apitools import encode_object_to_json, EnumPostRequestActions, RequestResponse, \
     EnumHttpResponseStatusCodes, RequestBody
@@ -78,39 +78,30 @@ class RestController(flask_restful.Resource, Generic[T]):
 
     def _create_with_response(self, request_object: dict):
         """Método para crear una entidad devolviendo una respuesta."""
-        try:
-            # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
-            entity = self.get_main_entity_type()(**request_object)
-            # Importante llamar la función dentro de una transacción
-            self.get_main_service().start_transaction(self.get_main_service().insert, entity)
+        # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
+        entity = self.get_main_entity_type()(**request_object)
+        # Importante llamar la función dentro de una transacción
+        self.get_main_service().start_transaction(self.get_main_service().insert, entity)
 
-            return i18n.translate("i18n_base_common_insert_success", None, *[str(entity)])
-        except ServiceException as e:
-            raise e
+        return i18n.translate("i18n_base_common_insert_success", None, *[str(entity)])
 
     def _delete_with_response(self, request_object: dict):
         """Método para borrar una entidad devolviendo una respuesta."""
-        try:
-            # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
-            entity = self.get_main_entity_type()(**request_object)
-            # Importante llamar la función dentro de una transacción
-            self.get_main_service().start_transaction(self.get_main_service().delete_entity, entity)
+        # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
+        entity = self.get_main_entity_type()(**request_object)
+        # Importante llamar la función dentro de una transacción
+        self.get_main_service().start_transaction(self.get_main_service().delete_entity, entity)
 
-            return i18n.translate("i18n_base_common_delete_success", None, *[str(entity)])
-        except ServiceException as e:
-            raise e
+        return i18n.translate("i18n_base_common_delete_success", None, *[str(entity)])
 
     def _update_with_response(self, request_object: dict):
         """Método para actualizar una entidad devolviendo una respuesta."""
-        try:
-            # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
-            entity = self.get_main_entity_type()(**request_object)
-            # Importante llamar la función dentro de una transacción
-            self.get_main_service().start_transaction(self.get_main_service().update, entity)
+        # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
+        entity = self.get_main_entity_type()(**request_object)
+        # Importante llamar la función dentro de una transacción
+        self.get_main_service().start_transaction(self.get_main_service().update, entity)
 
-            return i18n.translate("i18n_base_common_update_success", None, *[str(entity)])
-        except ServiceException as e:
-            raise e
+        return i18n.translate("i18n_base_common_update_success", None, *[str(entity)])
 
     def _select_with_response(self, request_object: dict):
         """Método para seleccionar datos de una tabla."""
@@ -153,6 +144,17 @@ class RestController(flask_restful.Resource, Generic[T]):
         :param request_body: Objeto de cuerpo de request.
         :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
         """
+        return self.__resolve_action_inner(request_body)
+
+    @catch_exceptions
+    def __resolve_action_inner(self, request_body: RequestBody):
+        """
+        Método privado. Interior de _resolve_action: _resolve_action es un hook para que los controllers que lo
+        precisen lo implementen, y que el programador se despreocupe de tener que tratar la excepción porque el
+        método inner ya tiene asociado el decorator para capturarla.
+        :param request_body: Objeto de cuerpo de request.
+        :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
+        """
         # Comprobar la acción enviada en la Request
         request_action = EnumPostRequestActions(request_body.action)
 
@@ -182,7 +184,7 @@ class RestController(flask_restful.Resource, Generic[T]):
             # Devuelvo una respuesta correcta
             response_body = RequestResponse(result, success=True, status_code=EnumHttpResponseStatusCodes.OK.value)
             return self._convert_request_response_to_json_response(response_body)
-        except ServiceException as e:
+        except CustomException as e:
             result = i18n.translate("i18n_base_commonError_request", None, *[e.known_error])
             response_body = RequestResponse(result, success=False,
                                             status_code=EnumHttpResponseStatusCodes.BAD_REQUEST.value)

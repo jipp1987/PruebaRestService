@@ -9,7 +9,7 @@ _known_error_types = [("IntegrityError", "i18n_base_knownError_integrityError")]
 """Errores conocidos y su clave i18n de error conocido, es lo que se intenta mostrar al usuario."""
 
 
-class ServiceException(Exception):
+class CustomException(Exception):
     """Excepción personalizada, a modo de barrera de fallos para intepretar las excepciones y no perder su
     información. Se utiliza en los servicios.
     """
@@ -63,7 +63,7 @@ def catch_exceptions(function):
             # Python puede devolver la ejecución de una función
             # Si se produce algún error, uso el código except... para capturarla y tratarla a modo de barrera de fallos
             return function(*args, **kwargs)
-        except ServiceException as c:
+        except CustomException as c:
             # Si ya ha sido envuelta en una CustomException, que la devuelva directamente
             raise c
         except Exception as e:
@@ -92,7 +92,7 @@ def catch_exceptions(function):
             )
 
             # ojo porque lo que me interesa es lanzar la excepción hacia arriba, envuelta en una CustomException
-            raise ServiceException(message, exc_instance, exc_type.__name__, error_line)
+            raise CustomException(message, exc_instance, exc_type.__name__, error_line)
 
     return decorator
 
