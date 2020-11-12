@@ -136,23 +136,26 @@ class RestController(flask_restful.Resource, Generic[T]):
         """
         return make_response(encode_object_to_json(response_body), response_body.status_code)
 
-    def _resolve_action(self, request_body: RequestBody):
+    @catch_exceptions
+    def __resolve_action_outer(self, request_body: RequestBody):
         """
-        Resuelve la acción a realizar a través del objeto RequestBody. En una función protected. Por defecto hará
-        acciones de crear, borrar, actualizar o listar. Si un restcontroller no realiza alguna de estas funciones,
-        lo mejor que es sobresciba esta función y realice la acción que considere.
+        Resuelve la acción a realizar a través del objeto RequestBody. Es una función privada a modo de hook para
+        tratar las excepciones a través del decorator catch_exceptions, así me despreocupo de tener que acordarme
+        en las implementaciones de RestController.
         :param request_body: Objeto de cuerpo de request.
         :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
         """
-        return self.__resolve_action_inner(request_body)
+        return self._resolve_action(request_body)
 
-    @catch_exceptions
-    def __resolve_action_inner(self, request_body: RequestBody):
+    def _resolve_action(self, request_body: RequestBody):
         """
-        Método privado. Interior de _resolve_action: _resolve_action es un hook para que los controllers que lo
-        precisen lo implementen, y que el programador se despreocupe de tener que tratar la excepción porque el
-        método inner ya tiene asociado el decorator para capturarla.
-        :param request_body: Objeto de cuerpo de request.
+        Método que resuelve la acción a realizar en post a través del RequestBody, en concreto de un int con la acción
+        seleccionada. Las implementaciones de RestController que lo necesiten pueden sobrescribir esta función.
+        :param request_body: Objeto de cuerpo de request. Obtiene de éste un int "action" con la acción a realizar.
+        1 -> Crear
+        2 -> Actualizar
+        3 -> Borrar
+        4 -> Seleccionar
         :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
         """
         # Comprobar la acción enviada en la Request
@@ -171,7 +174,8 @@ class RestController(flask_restful.Resource, Generic[T]):
 
     def post(self):
         """
-        Método post de controller rest de tipos de cliente.
+        Método post de controller rest de tipos de cliente. NO se recomienda su sobrescritura. Si lo que se desea es
+        sobrescribir el comportamiento de RestController, lo mejor es sobrescribir _resolve_action.
         :return: Cadena con mensaje formateado para devolver al solicitante.
         """
         # Obtengo datos json de la petición
@@ -179,7 +183,7 @@ class RestController(flask_restful.Resource, Generic[T]):
 
         try:
             # Comprobar la acción enviada en la Request
-            result = self._resolve_action(request_body)
+            result = self.__resolve_action_outer(request_body)
 
             # Devuelvo una respuesta correcta
             response_body = RequestResponse(result, success=True, status_code=EnumHttpResponseStatusCodes.OK.value)
