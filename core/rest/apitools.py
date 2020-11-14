@@ -8,8 +8,9 @@ import enum
 from typing import List, Tuple
 
 import flask_restful
-import jsonpickle
 from flask import Blueprint, request, Flask
+
+from core.util.jsonutils import encode_object_to_json
 
 
 class EnumPostRequestActions(enum.Enum):
@@ -80,20 +81,6 @@ class RequestResponse:
         self.success = success
         self.status_code = status_code
         self.response_object = response_object
-
-
-def encode_object_to_json(object_to_encode: any):
-    """
-    Serializa un objeto en json. Usa la librería jsonpickle.
-    :param object_to_encode: Objeto a codificar en json.
-    :return: json
-    """
-    # Preparo el objeto jsonpickle
-    jsonpickle.set_preferred_backend('json')
-    jsonpickle.set_encoder_options('json', ensure_ascii=False)
-    # unpicklable Si es true, lo que hace es dar más información de la clase tanto del objeto principal como de
-    # los objetos anidados. En principio lo pongo a false.
-    return jsonpickle.encode(object_to_encode, unpicklable=False)
 
 
 def create_api_from_blueprint(api_name: str = "api"):

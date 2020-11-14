@@ -1,5 +1,8 @@
 import gettext
+import glob
 import locale
+import pathlib
+import subprocess
 
 languages = {
     # base es el nombre del fichero mo, locales es el director en donde se encuentra
@@ -34,3 +37,22 @@ def translate(key: str, locale_iso: str = None, *args):
         result = result % args
 
     return result
+
+
+def create_mo_files(po_files: str, prefix: str):
+    """
+    Compila los ficheros .po en .mo.
+    :param po_files: Ruta y nombre de ficheros .po a compilar. Ejemplo: 'resources/locales/*/LC_MESSAGES/base.po'.
+    :param prefix: Ruta desde la que partimos a buscar los ficheros.
+    :return: Ficheros .mo compilados.
+    """
+    mo_files = []
+
+    for po_path in glob.glob(str(pathlib.Path(prefix) / po_files)):
+        mo = pathlib.Path(po_path.replace('.po', '.mo'))
+        # Ejecutar subproceso msgfmt, que compila los ficheros .po en .mo.
+        # OJO!!! Necesario instalar msgfmt en el OS, sino no funciona
+        subprocess.run(['msgfmt', '-o', str(mo), po_path], check=True)
+        mo_files.append(str(mo.relative_to(prefix)))
+
+    return mo_files

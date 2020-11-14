@@ -3,7 +3,7 @@ import traceback
 import types
 from functools import wraps
 
-from core.util import i18n
+from core.util import i18nutils
 
 _known_error_types = [("IntegrityError", "i18n_base_knownError_integrityError")]
 """Errores conocidos y su clave i18n de error conocido, es lo que se intenta mostrar al usuario."""
@@ -40,7 +40,7 @@ class CustomException(Exception):
                 # El tipo de excepción es la clave del diccionario
                 if self.exception_type == pair_values[0]:
                     # Esto es el valor, que es una clave i18n y es el error conocido
-                    string = i18n.translate(pair_values[1])
+                    string = i18nutils.translate(pair_values[1])
                     break
 
         return string

@@ -1,5 +1,4 @@
 import abc
-import json
 from functools import wraps
 from typing import TypeVar, Generic
 
@@ -9,10 +8,11 @@ from werkzeug.local import LocalProxy
 
 from core.exception.exceptionhandler import CustomException, catch_exceptions
 from core.model.baseentity import BaseEntity
-from core.rest.apitools import encode_object_to_json, EnumPostRequestActions, RequestResponse, \
+from core.rest.apitools import EnumPostRequestActions, RequestResponse, \
     EnumHttpResponseStatusCodes, RequestBody
 from core.service.service import BaseService
-from core.util import i18n
+from core.util import i18nutils
+from core.util.jsonutils import encode_object_to_json, decode_object_to_json
 from core.util.noconflict import makecls
 
 
@@ -83,7 +83,7 @@ class RestController(flask_restful.Resource, Generic[T]):
         # Importante llamar la función dentro de una transacción
         self.get_main_service().start_transaction(self.get_main_service().insert, entity)
 
-        return i18n.translate("i18n_base_common_insert_success", None, *[str(entity)])
+        return i18nutils.translate("i18n_base_common_insert_success", None, *[str(entity)])
 
     def _delete_with_response(self, request_object: dict):
         """Método para borrar una entidad devolviendo una respuesta."""
@@ -92,7 +92,7 @@ class RestController(flask_restful.Resource, Generic[T]):
         # Importante llamar la función dentro de una transacción
         self.get_main_service().start_transaction(self.get_main_service().delete_entity, entity)
 
-        return i18n.translate("i18n_base_common_delete_success", None, *[str(entity)])
+        return i18nutils.translate("i18n_base_common_delete_success", None, *[str(entity)])
 
     def _update_with_response(self, request_object: dict):
         """Método para actualizar una entidad devolviendo una respuesta."""
@@ -101,31 +101,11 @@ class RestController(flask_restful.Resource, Generic[T]):
         # Importante llamar la función dentro de una transacción
         self.get_main_service().start_transaction(self.get_main_service().update, entity)
 
-        return i18n.translate("i18n_base_common_update_success", None, *[str(entity)])
+        return i18nutils.translate("i18n_base_common_update_success", None, *[str(entity)])
 
     def _select_with_response(self, request_object: dict):
         """Método para seleccionar datos de una tabla."""
         pass
-
-    @staticmethod
-    def _convert_request_to_request_body(request_local_proxy: LocalProxy):
-        """
-        Convierte el get_json de un LocalProxy a un RequestBody.
-        :param request_local_proxy: Objeto LocalProxy que contiene el json
-        :return: RequestBody
-        """
-
-        # get_json devuelve un diccionario. Lo convierto a formato json para poder convertirlo a objeto
-        if request_local_proxy.get_json() is not None:
-            json_format = json.dumps(request_local_proxy.get_json(), ensure_ascii=False)
-
-            # lo convierto a diccionario
-            json_dict = json.loads(json_format)
-
-            # deserializo el diccionario en el objeto deseado
-            request_body = RequestBody(**json_dict)
-
-            return request_body
 
     @staticmethod
     def _convert_request_response_to_json_response(response_body: RequestResponse):
@@ -137,14 +117,19 @@ class RestController(flask_restful.Resource, Generic[T]):
         return make_response(encode_object_to_json(response_body), response_body.status_code)
 
     @catch_exceptions
-    def __resolve_action_outer(self, request_body: RequestBody):
+    def __resolve_action_outer(self, request_proxy: LocalProxy):
         """
         Resuelve la acción a realizar a través del objeto RequestBody. Es una función privada a modo de hook para
         tratar las excepciones a través del decorator catch_exceptions, así me despreocupo de tener que acordarme
         en las implementaciones de RestController.
-        :param request_body: Objeto de cuerpo de request.
+        :param request_proxy: Objeto request.
         :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
         """
+        # Primero transformo el objeto json de LocalProxy a string json
+        json_format = encode_object_to_json(request_proxy.get_json())
+        # Luego transformo el string json a un objeto RequestBody, pasando el tipo como parámetro
+        request_body = decode_object_to_json(json_format, RequestBody)
+        # Resolver acción
         return self._resolve_action(request_body)
 
     def _resolve_action(self, request_body: RequestBody):
@@ -174,22 +159,22 @@ class RestController(flask_restful.Resource, Generic[T]):
 
     def post(self):
         """
-        Método post de controller rest de tipos de cliente. NO se recomienda su sobrescritura. Si lo que se desea es
+        Método post de controller rest. NO se recomienda su sobrescritura. Si lo que se desea es
         sobrescribir el comportamiento de RestController, lo mejor es sobrescribir _resolve_action.
         :return: Cadena con mensaje formateado para devolver al solicitante.
         """
-        # Obtengo datos json de la petición
-        request_body = self._convert_request_to_request_body(request)
-
         try:
-            # Comprobar la acción enviada en la Request
-            result = self.__resolve_action_outer(request_body)
-
+            # Obtengo datos json de la petición
+            result = self.__resolve_action_outer(request)
             # Devuelvo una respuesta correcta
             response_body = RequestResponse(result, success=True, status_code=EnumHttpResponseStatusCodes.OK.value)
+
             return self._convert_request_response_to_json_response(response_body)
         except CustomException as e:
-            result = i18n.translate("i18n_base_commonError_request", None, *[e.known_error])
+            # Se produce algún error
+            print(str(e))
+            result = i18nutils.translate("i18n_base_commonError_request", None, *[e.known_error])
             response_body = RequestResponse(result, success=False,
                                             status_code=EnumHttpResponseStatusCodes.BAD_REQUEST.value)
-        return self._convert_request_response_to_json_response(response_body)
+
+            return self._convert_request_response_to_json_response(response_body)
