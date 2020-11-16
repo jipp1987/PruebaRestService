@@ -23,6 +23,29 @@ class BaseService(Generic[T]):
         # Tienen un dao asociado
         self._dao = dao
 
+    @abc.abstractmethod
+    def get_main_entity_type(self) -> type(T):
+        """
+        Función a implementar que devuelve la clase de la entidad principal.
+        :return: Clase de la entidad principal.
+        """
+        pass
+
+    def convert_dict_to_entity(self, request_object_dict: dict) -> T:
+        """
+        Convierte un diccionario en una entidad base, siendo la clave el nombre de cada campo. Por defecto, lo que
+        hace es descomponer el diccionario pasado como parámetro y usar los pares clave-valor obtenidos como argumentos
+        del contructor de la entidad base. Es posible que haya que implementar esta función en caso de que la entidad
+        tenga otras BaseEntity anidadas, en ese caso lo mejor es ir llamando a convert_dict_to_entity de los servicios
+        de esas entidades.
+        :param request_object_dict: Diccionario con el atributo y valor de los campos de la entidad base.
+        :return: Instancia de la entidad base con los atributos indicados en el diccionario.
+        """
+        # En este caso, de forma genérica, lo que hago es descomponer el diccionario en pares clave-valor con el
+        # operador **. Lo que va a hacer es ir al constructor del objeto y sustituir los argumentos de éste por los
+        # pares obtenidos.
+        return self.get_main_entity_type()(**request_object_dict)
+
     def start_transaction(self, function, *args, **kwargs):
         """
         Envuelve la función dentro de un contexto transaccional: se hace commit al final si no hay problemas,

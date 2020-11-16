@@ -5,7 +5,7 @@ class TipoCliente(BaseEntity):
     """Modelo de tipo de cliente."""
 
     # Constructor
-    def __init__(self, id=None, codigo=None, descripcion=None):
+    def __init__(self, id: int=None, codigo: str=None, descripcion: str=None):
         super().__init__()
         self.id = id
         self.codigo = codigo

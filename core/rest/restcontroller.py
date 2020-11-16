@@ -68,42 +68,28 @@ class RestController(flask_restful.Resource, Generic[T]):
         """
         pass
 
-    @abc.abstractmethod
-    def get_main_entity_type(self) -> type(T):
-        """
-        Función a implementar que devuelve la clase de la entidad principal.
-        :return: Clase de la entidad principal.
-        """
-        pass
-
-    def _create_with_response(self, request_object: dict):
+    def _create_with_response(self, entity: T):
         """Método para crear una entidad devolviendo una respuesta."""
-        # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
-        entity = self.get_main_entity_type()(**request_object)
         # Importante llamar la función dentro de una transacción
         self.get_main_service().start_transaction(self.get_main_service().insert, entity)
 
         return i18nutils.translate("i18n_base_common_insert_success", None, *[str(entity)])
 
-    def _delete_with_response(self, request_object: dict):
+    def _delete_with_response(self, entity: T):
         """Método para borrar una entidad devolviendo una respuesta."""
-        # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
-        entity = self.get_main_entity_type()(**request_object)
         # Importante llamar la función dentro de una transacción
         self.get_main_service().start_transaction(self.get_main_service().delete_entity, entity)
 
         return i18nutils.translate("i18n_base_common_delete_success", None, *[str(entity)])
 
-    def _update_with_response(self, request_object: dict):
+    def _update_with_response(self, entity: T):
         """Método para actualizar una entidad devolviendo una respuesta."""
-        # deserializo el request_object (es un diccionario) y lo convierto a tipo de cliente
-        entity = self.get_main_entity_type()(**request_object)
         # Importante llamar la función dentro de una transacción
         self.get_main_service().start_transaction(self.get_main_service().update, entity)
 
         return i18nutils.translate("i18n_base_common_update_success", None, *[str(entity)])
 
-    def _select_with_response(self, request_object: dict):
+    def _select_with_response(self):
         """Método para seleccionar datos de una tabla."""
         pass
 
@@ -129,31 +115,37 @@ class RestController(flask_restful.Resource, Generic[T]):
         json_format = encode_object_to_json(request_proxy.get_json())
         # Luego transformo el string json a un objeto RequestBody, pasando el tipo como parámetro
         request_body = decode_object_to_json(json_format, RequestBody)
+        # Convertir objeto de request a entidad base
+        entity = self.get_main_service().convert_dict_to_entity(request_body.request_object)
         # Resolver acción
-        return self._resolve_action(request_body)
+        return self._resolve_action(entity, request_body.action)
 
-    def _resolve_action(self, request_body: RequestBody):
+    def _resolve_action(self, entity: T, action: int):
         """
         Método que resuelve la acción a realizar en post a través del RequestBody, en concreto de un int con la acción
         seleccionada. Las implementaciones de RestController que lo necesiten pueden sobrescribir esta función.
-        :param request_body: Objeto de cuerpo de request. Obtiene de éste un int "action" con la acción a realizar.
+        :param entity: Entidad.
         1 -> Crear
         2 -> Actualizar
         3 -> Borrar
         4 -> Seleccionar
+        :param action: Entero con una acción a resolver.
         :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
         """
         # Comprobar la acción enviada en la Request
-        request_action = EnumPostRequestActions(request_body.action)
+        request_action = EnumPostRequestActions(action)
 
+        result = None
         if request_action == EnumPostRequestActions.CREATE:
-            result = self._create_with_response(request_body.request_object)
+            result = self._create_with_response(entity)
         elif request_action == EnumPostRequestActions.DELETE:
-            result = self._delete_with_response(request_body.request_object)
+            result = self._delete_with_response(entity)
         elif request_action == EnumPostRequestActions.UPDATE:
-            result = self._update_with_response(request_body.request_object)
+            result = self._update_with_response(entity)
         else:
-            result = self._select_with_response(request_body.request_object)
+            # TODO Implementar select
+            # result = self._select_with_response()
+            pass
 
         return result
 

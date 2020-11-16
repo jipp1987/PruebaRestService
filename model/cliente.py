@@ -1,4 +1,6 @@
 # Modelo para tabla clientes
+from decimal import Decimal
+
 from core.model.baseentity import BaseEntity
 from model.tipocliente import TipoCliente
 
@@ -10,14 +12,15 @@ class Cliente(BaseEntity):
     # llamar a variables de la misma forma
 
     # Constructor
-    def __init__(self, id=None, codigo=None, nombre=None, apellidos=None, saldo=None):
+    def __init__(self, id: int=None, codigo: str=None, nombre: str=None, apellidos: str=None, saldo: Decimal=None,
+                 tipo_cliente: TipoCliente = None):
         super().__init__()
         self.id = id
         self.codigo = codigo
         self.nombre = nombre
         self.apellidos = apellidos
         self.saldo = saldo
-        self.tipocliente = TipoCliente()
+        self.tipo_cliente = tipo_cliente
 
     # equals: uso el id para saber si es el mismo cliente
     def __eq__(self, other):
@@ -49,4 +52,4 @@ class Cliente(BaseEntity):
         # esto es una nueva forma en python3 de dar formato a un string, es mejor esto que concatenar cadenas,
         # sobretodo porque si le intentamos concatenar a una cadena un campo no string lanzará error durante
         # la ejecución
-        return f'id = {self.id}, codigo = {self.codigo}, (tipo de cliente = {self.tipocliente})'
+        return f'id = {self.id}, codigo = {self.codigo}, (tipo de cliente = {str(self.tipo_cliente)})'
