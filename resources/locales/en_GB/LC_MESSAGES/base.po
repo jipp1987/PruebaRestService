@@ -31,3 +31,6 @@ msgstr "The connection to the database is not open."
 
 msgid "i18n_base_commonError_request"
 msgstr "An error occurred processing the request: %s"
+
+msgid "i18n_base_knownError_operationalError"
+msgstr "An error occurred with one of the fields in the object."

@@ -5,7 +5,8 @@ from functools import wraps
 
 from core.util import i18nutils
 
-_known_error_types = [("IntegrityError", "i18n_base_knownError_integrityError")]
+_known_error_types = [("IntegrityError", "i18n_base_knownError_integrityError"),
+                      ("OperationalError", "i18n_base_knownError_operationalError")]
 """Errores conocidos y su clave i18n de error conocido, es lo que se intenta mostrar al usuario."""
 
 
