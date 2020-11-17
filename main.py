@@ -7,5 +7,5 @@ if __name__ == "__main__":
     pairs = [(ClienteRestController, "/Cliente")]
 
     app = create_app("api", pairs)
-    app.run(debug=True)
+    app.run(debug=True, threaded=True)
 

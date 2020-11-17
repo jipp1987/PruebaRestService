@@ -2,12 +2,45 @@ import abc
 from typing import Generic, TypeVar
 
 import pymysql as pymysql
+from dbutils.persistent_db import PersistentDB
 
 from core.exception.exceptionhandler import CustomException
 
 from core.util import i18nutils, resourceutils
 
 from core.model.baseentity import BaseEntity
+
+# PersistentDB: crea una conexión para cada hilo. Incluso si el hilo llama al método close, no se cerrará. Simplemente
+# vuelve a colocar la conexión en el grupo de conexiones para que su propio hilo la use nuevamente. Cuando termina
+# el hilo, la conexión se cierra automáticamente.
+POOL = PersistentDB(
+    creator=pymysql,
+    # Número máximo de veces que un link es reutilizado, None indica ilimitado
+    maxusage=None,
+    # Lista de comandos ejecutados antes de comenzar una sesión. Ejemplos:["set datestyle to ...", "set time zone ..."]
+    setsession=[],
+    # ping MySQL Server, comprueba si el servicio está disponible.# Ejemplo: 0 = none = never (nunca detectar),
+    # 1 = Default = Siempre que se solicite, 2 = Cuando un cursor es creado, 4 = Cuando se ejecuta una consulta,
+    # 7 = Siempre
+    ping=0,
+    # Si False, conn.close() De hecho, se ignora para el próximo uso, y el enlace se cerrará automáticamente cuando
+    # el hilo se cierre de nuevo.
+    # Si true, conn.close() Luego cierre el enlace y vuelva a llamar
+    # pool.connection se informará un error porque la conexión se ha cerrado (pool.steady_connection ()
+    # Puede obtener un nuevo enlace)
+    closeable=False,
+    # Este hilo tiene un objeto de valor exclusivo, que se utiliza para guardar el objeto vinculado.
+    threadlocal=None,
+    # Datos de conexión
+    host=resourceutils.get_data_from_resource("host"),
+    user=resourceutils.get_data_from_resource("username"),
+    password=resourceutils.get_data_from_resource("password"),
+    database=resourceutils.get_data_from_resource("dbname"),
+    # desactivar autocommit, las transacciones se manejan mejor manualmente
+    autocommit=False,
+    charset='utf8',
+    cursorclass=pymysql.cursors.DictCursor)
+"""Pool de conexiones."""
 
 T = TypeVar("T", bound=BaseEntity)
 """Clase genérica que herede de BaseEntity, que son las entidades persistidas en la base de datos."""
@@ -22,46 +55,36 @@ class BaseDao(Generic[T]):
     # Constructor
     def __init__(self, table: str):
         self.__table = table
-        # Los datos los cargo de un fichero situado en resources/db.properties (ignorado en git)
-        self.__host = resourceutils.get_data_from_resource("host")
-        self.__username = resourceutils.get_data_from_resource("username")
-        self.__password = resourceutils.get_data_from_resource("password")
-        self.__dbname = resourceutils.get_data_from_resource("dbname")
-        self._db = None
+        self._conn = None
 
     # Funciones
     def connect(self):
         """Conectarse a la base de datos."""
-        if self._db is None or self._db.open is False:
-            self._db = pymysql.connect(self.__host, self.__username, self.__password, self.__dbname)
-            # desactivar autocommit, las transacciones se manejan mejor manualmente
-            self._db.autocommit = False
+        self._conn = POOL.connection(shareable=False)
 
     def disconnect(self):
         """Desconectar de la base de datos."""
-        if self._db is not None and self._db.open:
-            self._db.close()
-            self._db = None
+        self._conn.close()
 
     def commit(self):
         """Hace commit."""
-        if self._db is not None and self._db.open:
-            self._db.commit()
+        if self._conn is not None:
+            self._conn.commit()
         else:
             raise CustomException(i18nutils.translate("i18n_base_commonError_database_connection"))
 
     def rollback(self):
         """Hace rollback."""
-        if self._db is not None and self._db.open:
-            self._db.rollback()
+        if self._conn is not None:
+            self._conn.rollback()
         else:
             raise CustomException(i18nutils.translate("i18n_base_commonError_database_connection"))
 
     def execute_query(self, sql):
         """Crea un cursor y ejecuta una query."""
-        if self._db is not None and self._db.open:
+        if self._conn is not None:
             # Crear cursor
-            cursor = self._db.cursor()
+            cursor = self._conn.cursor()
             # Ejecutar query
             try:
                 cursor.execute(sql)
