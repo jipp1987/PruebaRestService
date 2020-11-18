@@ -7,5 +7,6 @@ if __name__ == "__main__":
     pairs = [(ClienteRestController, "/Cliente")]
 
     app = create_app("api", pairs)
+    # Multihilo. Pero al ser un servidor para debug, es posible que sólo haya un hilo en ejecución.
     app.run(debug=True, threaded=True)
 

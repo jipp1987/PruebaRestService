@@ -2,7 +2,7 @@ import abc
 from typing import Generic, TypeVar
 
 import pymysql as pymysql
-from dbutils.persistent_db import PersistentDB
+from dbutils.pooled_db import PooledDB
 
 from core.exception.exceptionhandler import CustomException
 
@@ -10,36 +10,39 @@ from core.util import i18nutils, resourceutils
 
 from core.model.baseentity import BaseEntity
 
-# PersistentDB: crea una conexión para cada hilo. Incluso si el hilo llama al método close, no se cerrará. Simplemente
-# vuelve a colocar la conexión en el grupo de conexiones para que su propio hilo la use nuevamente. Cuando termina
-# el hilo, la conexión se cierra automáticamente.
-POOL = PersistentDB(
-    creator=pymysql,
-    # Número máximo de veces que un link es reutilizado, None indica ilimitado
-    maxusage=None,
-    # Lista de comandos ejecutados antes de comenzar una sesión. Ejemplos:["set datestyle to ...", "set time zone ..."]
-    setsession=[],
-    # ping MySQL Server, comprueba si el servicio está disponible.# Ejemplo: 0 = none = never (nunca detectar),
-    # 1 = Default = Siempre que se solicite, 2 = Cuando un cursor es creado, 4 = Cuando se ejecuta una consulta,
-    # 7 = Siempre
-    ping=0,
-    # Si False, conn.close() De hecho, se ignora para el próximo uso, y el enlace se cerrará automáticamente cuando
-    # el hilo se cierre de nuevo.
-    # Si true, conn.close() Luego cierre el enlace y vuelva a llamar
-    # pool.connection se informará un error porque la conexión se ha cerrado (pool.steady_connection ()
-    # Puede obtener un nuevo enlace)
-    closeable=False,
-    # Este hilo tiene un objeto de valor exclusivo, que se utiliza para guardar el objeto vinculado.
-    threadlocal=None,
-    # Datos de conexión
-    host=resourceutils.get_data_from_resource("host"),
-    user=resourceutils.get_data_from_resource("username"),
-    password=resourceutils.get_data_from_resource("password"),
-    database=resourceutils.get_data_from_resource("dbname"),
+_db_config = {
+    'host': resourceutils.get_data_from_resource("host"),
+    'user': resourceutils.get_data_from_resource("username"),
+    'password': resourceutils.get_data_from_resource("password"),
+    'database': resourceutils.get_data_from_resource("dbname"),
     # desactivar autocommit, las transacciones se manejan mejor manualmente
-    autocommit=False,
-    charset='utf8',
-    cursorclass=pymysql.cursors.DictCursor)
+    'autocommit': False,
+    'charset': 'utf8',
+    'cursorclass': pymysql.cursors.DictCursor
+}
+"""Configuración de la base de datos."""
+
+# PooledDB: Pool para multihilo.
+_POOL = PooledDB(
+    creator=pymysql,
+    # Número máximo de conexiones permitidas en el pool, 0 y None indican sin límite
+    maxconnections=5,
+    # Durante la inicialización, al menos la conexión inactiva creada por el pool de conexiones, 0 significa no creado
+    mincached=3,
+    # El número máximo de conexiones que están inactivas en el pool. 0 y Ninguno indican que no hay límite.
+    maxcached=8,
+    # El número máximo de conexiones en el pool de conexiones, 0 y Ninguno indican que todas son compartidas (lo cual es
+    # inútil)
+    maxshared=5,
+    # Si no hay una conexión compartida disponible en el pool, ¿espera el bloqueo? True significa esperar, etc.
+    # Falso significa no esperar y luego dar un error
+    blocking=True,
+    # Lista de comandos ejecutados antes de iniciar sesión
+    setsession=[],
+    # ping Mysql server comprueba si el servicio está disponible
+    ping=0,
+    # Datos de conexión
+    **_db_config)
 """Pool de conexiones."""
 
 T = TypeVar("T", bound=BaseEntity)
@@ -60,10 +63,12 @@ class BaseDao(Generic[T]):
     # Funciones
     def connect(self):
         """Conectarse a la base de datos."""
-        self._conn = POOL.connection(shareable=False)
+        self._conn = _POOL.connection()
 
     def disconnect(self):
         """Desconectar de la base de datos."""
+        # Esto no cierra la conexión, sólo la devuelve al pool de conexiones para que su propio hilo la use de nuevo.
+        # La conexión se cierra automáticamente cuando termina el hilo.
         self._conn.close()
 
     def commit(self):
