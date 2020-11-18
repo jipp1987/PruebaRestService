@@ -1,5 +1,4 @@
 import abc
-from typing import Generic, TypeVar
 
 import pymysql as pymysql
 from dbutils.pooled_db import PooledDB
@@ -45,15 +44,9 @@ _POOL = PooledDB(
     **_db_config)
 """Pool de conexiones."""
 
-T = TypeVar("T", bound=BaseEntity)
-"""Clase genérica que herede de BaseEntity, que son las entidades persistidas en la base de datos."""
 
-
-class BaseDao(Generic[T]):
+class BaseDao(metaclass=abc.ABCMeta):
     """Dao genérico."""
-
-    __metaclass__ = abc.ABCMeta
-    """Clase abstracta."""
 
     # Constructor
     def __init__(self, table: str):
@@ -101,7 +94,7 @@ class BaseDao(Generic[T]):
         else:
             raise CustomException(i18nutils.translate("i18n_base_commonError_database_connection"))
 
-    def insert(self, entity: T):
+    def insert(self, entity: BaseEntity):
         """Insertar registros."""
         # Ejecutar query
         sql = f"insert into {self.__table} ({entity.get_field_names_as_str()}) " \
@@ -112,7 +105,7 @@ class BaseDao(Generic[T]):
         # cerrar cursor
         cursor.close()
 
-    def update(self, entity: T):
+    def update(self, entity: BaseEntity):
         """Actualizar registros."""
         # Ejecutar query
         sql = f"update {self.__table} set {entity.get_fields_with_value_as_str()} " \
@@ -121,7 +114,7 @@ class BaseDao(Generic[T]):
         # cerrar cursor
         cursor.close()
 
-    def delete_entity(self, entity: T):
+    def delete_entity(self, entity: BaseEntity):
         """
         Elimina una entidad de la base de datos.
         :param entity: Entidad a eliminar.

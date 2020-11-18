@@ -1,37 +1,31 @@
 import abc
-from typing import TypeVar, Generic
 
 from core.dao.basedao import BaseDao
 from core.exception.exceptionhandler import BugBarrier
 from core.model.baseentity import BaseEntity
 from core.util.noconflict import makecls
 
-T = TypeVar("T", bound=BaseEntity)
-"""Clase genérica que herede de BaseEntity, que son las entidades persistidas en la base de datos."""
-DAO = TypeVar("DAO", bound=BaseDao)
-"""Implementación de BaseDao que utilice la entidad base"""
 
-
-class BaseService(Generic[T]):
+class BaseService:
     """
     Clase abstract de la que han de heredar el resto de servicios del programa.
     """
     # Llamo a la factoría de metaclases para que me "fusione" las dos metaclases que me interesan.
     __metaclass__ = makecls(BugBarrier, abc.ABCMeta)
 
-    def __init__(self, dao: DAO):
+    def __init__(self, dao: BaseDao):
         # Tienen un dao asociado
         self._dao = dao
 
     @abc.abstractmethod
-    def get_main_entity_type(self) -> type(T):
+    def get_main_entity_type(self):
         """
         Función a implementar que devuelve la clase de la entidad principal.
         :return: Clase de la entidad principal.
         """
         pass
 
-    def convert_dict_to_entity(self, request_object_dict: dict) -> T:
+    def convert_dict_to_entity(self, request_object_dict: dict) -> BaseEntity:
         """
         Convierte un diccionario en una entidad base, siendo la clave el nombre de cada campo. Por defecto, lo que
         hace es descomponer el diccionario pasado como parámetro y usar los pares clave-valor obtenidos como argumentos
@@ -71,15 +65,15 @@ class BaseService(Generic[T]):
             # Desconectar siempre al final
             self._dao.disconnect()
 
-    def insert(self, entity: T):
+    def insert(self, entity: BaseEntity):
         """Insertar registros."""
         self._dao.insert(entity)
 
-    def update(self, entity: T):
+    def update(self, entity: BaseEntity):
         """Actualizar registros."""
         self._dao.update(entity)
 
-    def delete_entity(self, entity: T):
+    def delete_entity(self, entity: BaseEntity):
         """Eliminar registros."""
         self._dao.delete_entity(entity)
 

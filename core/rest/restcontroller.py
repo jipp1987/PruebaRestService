@@ -1,6 +1,5 @@
 import abc
 from functools import wraps
-from typing import TypeVar, Generic
 
 import flask_restful
 from flask import make_response, request
@@ -38,13 +37,7 @@ def authenticate(func):
     return wrapper
 
 
-T = TypeVar("T", bound=BaseEntity)
-"""Clase genérica que herede de BaseEntity, que son las entidades persistidas en la base de datos."""
-SERVICE = TypeVar("SERVICE", bound=BaseService)
-"""Implementación de BaseService que utilice la entidad base"""
-
-
-class RestController(flask_restful.Resource, Generic[T]):
+class RestController(flask_restful.Resource):
     """Implementación de los Resource de flask_restful. Los recursos de la aplicación deberán heredar de esta clase.
     Es una clase abstracta, por eso su metaclase es ABCMeta. """
 
@@ -61,28 +54,28 @@ class RestController(flask_restful.Resource, Generic[T]):
     method_decorators = [authenticate]
 
     @abc.abstractmethod
-    def get_main_service(self) -> SERVICE:
+    def get_main_service(self) -> BaseService:
         """
         Función a implementar que devuelve un SERVICE a modo de servicio principal.
         :return: Objeto que herede de BaseService.
         """
         pass
 
-    def _create_with_response(self, entity: T):
+    def _create_with_response(self, entity: BaseEntity):
         """Método para crear una entidad devolviendo una respuesta."""
         # Importante llamar la función dentro de una transacción
         self.get_main_service().start_transaction(self.get_main_service().insert, entity)
 
         return i18nutils.translate("i18n_base_common_insert_success", None, *[str(entity)])
 
-    def _delete_with_response(self, entity: T):
+    def _delete_with_response(self, entity: BaseEntity):
         """Método para borrar una entidad devolviendo una respuesta."""
         # Importante llamar la función dentro de una transacción
         self.get_main_service().start_transaction(self.get_main_service().delete_entity, entity)
 
         return i18nutils.translate("i18n_base_common_delete_success", None, *[str(entity)])
 
-    def _update_with_response(self, entity: T):
+    def _update_with_response(self, entity: BaseEntity):
         """Método para actualizar una entidad devolviendo una respuesta."""
         # Importante llamar la función dentro de una transacción
         self.get_main_service().start_transaction(self.get_main_service().update, entity)
@@ -120,7 +113,7 @@ class RestController(flask_restful.Resource, Generic[T]):
         # Resolver acción
         return self._resolve_action(entity, request_body.action)
 
-    def _resolve_action(self, entity: T, action: int):
+    def _resolve_action(self, entity: BaseEntity, action: int):
         """
         Método que resuelve la acción a realizar en post a través del RequestBody, en concreto de un int con la acción
         seleccionada. Las implementaciones de RestController que lo necesiten pueden sobrescribir esta función.

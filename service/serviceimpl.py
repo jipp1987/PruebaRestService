@@ -1,10 +1,11 @@
+from core.model.baseentity import BaseEntity
 from core.service.service import BaseService, ServiceFactory
 from dao.daoimpl import TipoClienteDao, ClienteDao
 from model.cliente import Cliente
 from model.tipocliente import TipoCliente
 
 
-class TipoClienteService(BaseService[TipoCliente]):
+class TipoClienteService(BaseService):
     """Implementacion de service de tiposcliente. La herencia se realiza pasando como parámetro la clase padre."""
 
     # Constructor
@@ -16,7 +17,7 @@ class TipoClienteService(BaseService[TipoCliente]):
         return TipoCliente
 
 
-class ClienteService(BaseService[Cliente]):
+class ClienteService(BaseService):
     """Implementacion de service de clientes. La herencia se realiza pasando como parámetro la clase padre."""
 
     # Constructor
@@ -27,7 +28,7 @@ class ClienteService(BaseService[Cliente]):
     def get_main_entity_type(self):
         return Cliente
 
-    def convert_dict_to_entity(self, request_object_dict: dict) -> Cliente:
+    def convert_dict_to_entity(self, request_object_dict: dict) -> BaseEntity:
         # Primero convierto el diccionario a cliente
         cliente = super().convert_dict_to_entity(request_object_dict)
 
