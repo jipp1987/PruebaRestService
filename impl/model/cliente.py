@@ -12,7 +12,8 @@ class Cliente(BaseEntity):
     # llamar a variables de la misma forma
 
     # Constructor
-    def __init__(self, id: int=None, codigo: str=None, nombre: str=None, apellidos: str=None, saldo: Decimal=None,
+    def __init__(self, id: int = None, codigo: str = None, nombre: str = None, apellidos: str = None,
+                 saldo: Decimal = None,
                  tipo_cliente: TipoCliente = None):
         super().__init__()
         self.id = id
@@ -22,27 +23,64 @@ class Cliente(BaseEntity):
         self.saldo = saldo
         self.tipo_cliente = tipo_cliente
 
-    @classmethod
-    def convert_dict_to_entity(cls, d: dict):
-        """
-        Sobrescritura de convert_dict_to_entity para tratar las entidades anidadas. Cuando se convierte de json a
-        entidad, las BaseEntities anidadas son dicts. Lo que hay que hacer es ir llamando a convert_dict_to_entity de
-        cada una de ellas para ir transformándolas en la clase correcta.
-        :param d: Diccionario.
-        :return: Cliente
-        """
-        # Primero convierto el diccionario a cliente
-        cliente = super().convert_dict_to_entity(d)
+    # PROPIEDADES Y SETTERS
+    @property
+    def id(self):
+        return self.__id
 
-        # En este punto, el tipo de cliente es un diccionario debido a la conversión json. Lo transformo usando
-        # el servicio de tipos de cliente.
-        # tipo_cliente_service = ServiceFactory.get_service(TipoClienteService)
-        # cliente.tipo_cliente = tipo_cliente_service.convert_dict_to_entity(cliente.tipo_cliente)
-        if cliente.tipo_cliente is not None:
-            cliente.tipo_cliente = TipoCliente.convert_dict_to_entity(cliente.tipo_cliente)
+    @id.setter
+    def id(self, id):
+        self.__id = id if id is not None and id > 0 else None
 
-        return cliente
+    @property
+    def codigo(self):
+        return self.__codigo
 
+    @codigo.setter
+    def codigo(self, codigo):
+        self.__codigo = codigo
+
+    @property
+    def nombre(self):
+        return self.__nombre
+
+    @nombre.setter
+    def nombre(self, nombre):
+        self.__nombre = nombre
+
+    @property
+    def apellidos(self):
+        return self.__apellidos
+
+    @apellidos.setter
+    def apellidos(self, apellidos):
+        self.__apellidos = apellidos
+
+    @property
+    def saldo(self):
+        return self.__saldo
+
+    @saldo.setter
+    def saldo(self, saldo):
+        # Si no es Decimal transformarlo: mejor pasarlo primero a String y de String a decimal para evitar pérdida de
+        # preción decimal.
+        if saldo is not None:
+            self.__saldo = saldo if isinstance(saldo, Decimal) else Decimal(str(saldo))
+        else:
+            self.__saldo = None
+
+    @property
+    def tipo_cliente(self):
+        return self.__tipo_cliente
+
+    @tipo_cliente.setter
+    def tipo_cliente(self, tipo_cliente):
+        # Si tipo de cliente es un diccionario, pasar de diccionario a entidad según la clase tipo de cliente. Puede
+        # venir como diccionario por ejemplo desde una conversión desde json.
+        self.__tipo_cliente = TipoCliente.convert_dict_to_entity(tipo_cliente) \
+            if tipo_cliente is not None and isinstance(tipo_cliente, dict) else tipo_cliente
+
+    # FUNCIONES
     # equals: uso el id para saber si es el mismo cliente
     def __eq__(self, other):
         # Primero se comprueba que sea una instancia de la misma clase o de una subclase
