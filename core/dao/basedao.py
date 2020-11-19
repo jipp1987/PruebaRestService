@@ -101,7 +101,7 @@ class BaseDao(metaclass=abc.ABCMeta):
               f"values ({entity.get_field_values_as_str()}) "
         cursor = self.execute_query(sql)
         # A través del cursor, le setteo a la entidad el id asignado en la base de datos
-        setattr(entity, entity.idfieldname, cursor.lastrowid)
+        setattr(entity, entity.id_field_name, cursor.lastrowid)
         # cerrar cursor
         cursor.close()
 
@@ -109,7 +109,7 @@ class BaseDao(metaclass=abc.ABCMeta):
         """Actualizar registros."""
         # Ejecutar query
         sql = f"update {self.__table} set {entity.get_fields_with_value_as_str()} " \
-              f"where id = {getattr(entity, entity.idfieldname)}"
+              f"where id = {getattr(entity, entity.id_field_name)}"
         cursor = self.execute_query(sql)
         # cerrar cursor
         cursor.close()
@@ -119,7 +119,7 @@ class BaseDao(metaclass=abc.ABCMeta):
         Elimina una entidad de la base de datos.
         :param entity: Entidad a eliminar.
         """
-        sql = f"delete from {self.__table} where id = {getattr(entity, entity.idfieldname)}"
+        sql = f"delete from {self.__table} where id = {getattr(entity, entity.id_field_name)}"
         cursor = self.execute_query(sql)
         # cerrar cursor
         cursor.close()

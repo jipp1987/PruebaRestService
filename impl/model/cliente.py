@@ -2,7 +2,7 @@
 from decimal import Decimal
 
 from core.model.baseentity import BaseEntity
-from model.tipocliente import TipoCliente
+from impl.model.tipocliente import TipoCliente
 
 
 class Cliente(BaseEntity):
@@ -21,6 +21,27 @@ class Cliente(BaseEntity):
         self.apellidos = apellidos
         self.saldo = saldo
         self.tipo_cliente = tipo_cliente
+
+    @classmethod
+    def convert_dict_to_entity(cls, d: dict):
+        """
+        Sobrescritura de convert_dict_to_entity para tratar las entidades anidadas. Cuando se convierte de json a
+        entidad, las BaseEntities anidadas son dicts. Lo que hay que hacer es ir llamando a convert_dict_to_entity de
+        cada una de ellas para ir transformándolas en la clase correcta.
+        :param d: Diccionario.
+        :return: Cliente
+        """
+        # Primero convierto el diccionario a cliente
+        cliente = super().convert_dict_to_entity(d)
+
+        # En este punto, el tipo de cliente es un diccionario debido a la conversión json. Lo transformo usando
+        # el servicio de tipos de cliente.
+        # tipo_cliente_service = ServiceFactory.get_service(TipoClienteService)
+        # cliente.tipo_cliente = tipo_cliente_service.convert_dict_to_entity(cliente.tipo_cliente)
+        if cliente.tipo_cliente is not None:
+            cliente.tipo_cliente = TipoCliente.convert_dict_to_entity(cliente.tipo_cliente)
+
+        return cliente
 
     # equals: uso el id para saber si es el mismo cliente
     def __eq__(self, other):

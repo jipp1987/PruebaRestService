@@ -1,5 +1,5 @@
 from core.rest.apitools import create_app
-from rest.restcontrollerimpl import TipoClienteRestController, ClienteRestController
+from impl.rest.restcontrollerimpl import TipoClienteRestController, ClienteRestController
 
 if __name__ == "__main__":
     # Lista de pares de valores: primero valor la ruta de la api, segundo valor el controlador de dicha ruta

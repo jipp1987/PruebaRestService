@@ -1,6 +1,6 @@
 from core.rest.restcontroller import RestController
 from core.service.service import ServiceFactory
-from service.serviceimpl import TipoClienteService, ClienteService
+from impl.service.serviceimpl import TipoClienteService, ClienteService
 
 
 class TipoClienteRestController(RestController):

@@ -109,7 +109,7 @@ class RestController(flask_restful.Resource):
         # Luego transformo el string json a un objeto RequestBody, pasando el tipo como parámetro
         request_body = decode_object_to_json(json_format, RequestBody)
         # Convertir objeto de request a entidad base
-        entity = self.get_main_service().convert_dict_to_entity(request_body.request_object)
+        entity = self.get_main_service().entity_type.convert_dict_to_entity(request_body.request_object)
         # Resolver acción
         return self._resolve_action(entity, request_body.action)
 
