@@ -18,7 +18,7 @@ class TipoCliente(BaseEntity):
 
     @id.setter
     def id(self, id):
-        self.__id = id if id is not None and id > 0 else None
+        self.__id = id
 
     @property
     def codigo(self):
