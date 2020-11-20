@@ -1,5 +1,6 @@
 # Modelo para tabla clientes
 from decimal import Decimal
+from typing import Dict, Tuple
 
 from core.model.baseentity import BaseEntity
 from impl.model.tipocliente import TipoCliente
@@ -10,6 +11,15 @@ class Cliente(BaseEntity):
 
     # clienteid -> id (no puedo usar el mismo nombre de campo, id es una función interna de python y no se recomienda)
     # llamar a variables de la misma forma
+    # Diccionario valores modelo
+    __model_dict: Dict[str, Tuple[type, str]] = {
+        'id': (str, 'id'),
+        'codigo': (str, 'codigo'),
+        'nombre': (str, 'nombre'),
+        'apellidos': (str, 'apellidos'),
+        'saldo': (Decimal, 'saldo'),
+        'tipo_cliente': (TipoCliente, 'tipoclienteid'),
+    }
 
     # Constructor
     def __init__(self, id: int = None, codigo: str = None, nombre: str = None, apellidos: str = None,
@@ -75,12 +85,12 @@ class Cliente(BaseEntity):
 
     @tipo_cliente.setter
     def tipo_cliente(self, tipo_cliente):
-        # Si tipo de cliente es un diccionario, pasar de diccionario a entidad según la clase tipo de cliente. Puede
-        # venir como diccionario por ejemplo desde una conversión desde json.
-        self.__tipo_cliente = TipoCliente.convert_dict_to_entity(tipo_cliente) \
-            if tipo_cliente is not None and isinstance(tipo_cliente, dict) else tipo_cliente
+        self.__tipo_cliente = tipo_cliente
 
     # FUNCIONES
+    def get_model_dict(self):
+        return self.__model_dict
+
     # equals: uso el id para saber si es el mismo cliente
     def __eq__(self, other):
         # Primero se comprueba que sea una instancia de la misma clase o de una subclase

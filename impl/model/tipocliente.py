@@ -1,11 +1,20 @@
+from typing import Dict, Tuple
+
 from core.model.baseentity import BaseEntity
 
 
 class TipoCliente(BaseEntity):
     """Modelo de tipo de cliente."""
 
+    # Diccionario valores modelo
+    __model_dict: Dict[str, Tuple[type, str]] = {
+        'id': (str, 'id'),
+        'codigo': (str, 'codigo'),
+        'descripcion': (str, 'descripcion'),
+    }
+
     # Constructor
-    def __init__(self, id: int=None, codigo: str=None, descripcion: str=None):
+    def __init__(self, id: int = None, codigo: str = None, descripcion: str = None):
         super().__init__()
         self.id = id
         self.codigo = codigo
@@ -37,6 +46,9 @@ class TipoCliente(BaseEntity):
         self.__descripcion = descripcion
 
     # FUNCIONES
+    def get_model_dict(self):
+        return self.__model_dict
+
     # equals: uso el id para saber si es el mismo tipo de cliente
     def __eq__(self, other):
         if isinstance(other, self.__class__):

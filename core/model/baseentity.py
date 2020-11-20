@@ -1,4 +1,5 @@
 import abc
+from typing import Dict, Tuple
 
 
 class BaseEntity(metaclass=abc.ABCMeta):
@@ -25,7 +26,38 @@ class BaseEntity(metaclass=abc.ABCMeta):
         # En este caso, de forma genérica, lo que hago es descomponer el diccionario en pares clave-valor con el
         # operador **. Lo que va a hacer es ir al constructor del objeto y sustituir los argumentos de éste por los
         # pares obtenidos.
-        return cls(**d)
+        entity = cls(**d)
+
+        # Voy a iterar sobre los valores del objeto en función del diccionario de valores del modelo
+        # Lo hago porque al transformar un diccionario en un modelo, si tiene otro modelo anidado éste sigue siendo
+        # un diccionario tras la transformación, con lo cual lo que hay que hacer es llamar de forma recursiva a esta
+        # función para tranformar todos los modelos anidados en objetos BaseEntity
+        for key, value in entity.get_model_dict().items():
+            # El valor de la clave es una tupla con el tipo de dato y el nombre del campo en la base de datos
+            # Cojo el primer valor de la tupla, que es el tipo del campo
+            entity_type = value[0]
+
+            # Compruebo si el tipo hereda de BaseEntity
+            if issubclass(entity_type, BaseEntity):
+                other_entity = getattr(entity, key)
+
+                # si es el valor es un diccionario, llamo de forma recursiva a esta función para transformarlo
+                if isinstance(other_entity, dict):
+                    # Al llamarse de forma recursiva, se irán transformando también los objetos anidados que tenga
+                    # el diccionario
+                    setattr(entity, key, entity_type.convert_dict_to_entity(other_entity))
+
+        return entity
+
+    @abc.abstractmethod
+    def get_model_dict(self) -> Dict[str, Tuple[type, str]]:
+        """
+        Devuelve un diccionario siendo la clave un String con el nombre del campo del modelo en Python, y el valor
+        una tupla con el tipo de objeto que le corresponde en el modelo Python y un String con el nombre del campo
+        en la base de datos.
+        :return: Dict[str, Tuple[any, str]
+        """
+        pass
 
     def get_field_names_as_str(self):
         """
