@@ -1,11 +1,23 @@
+from typing import List
+
 from jproperties import Properties
 
 configs = Properties()
 """Objeto Properties que almacenará los recursos externos de la aplicación."""
 
-# Cargar fichero de propiedades en objeto Properties
-with open('resources/db.properties', 'rb') as config_file:
-    configs.load(config_file)
+
+def load_resource_files(resource_list: List[str]):
+    """
+    Carga un fichero de recursos en atributo configs del módulo.
+    :param resource_list: Lista de rutas de los ficheros de recursos.
+    :return: Nada.
+    """
+    # Recorro la lista de ficheros y los añado.
+    if resource_list:
+        for path_to_file in resource_list:
+            with open(path_to_file, 'rb') as config_file:
+                configs.load(config_file)
+
 
 # Con esto se pueden cargar varios ficheros properties
 # with open('a', 'w') as a and open('b', 'w') as b:

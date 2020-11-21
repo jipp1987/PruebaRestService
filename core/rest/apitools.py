@@ -11,7 +11,9 @@ import flask_restful
 from flask import Blueprint, request, Flask
 
 from core.dao.basedao import BaseDao
+from core.util.i18nutils import add_language_dictionaries
 from core.util.jsonutils import encode_object_to_json
+from core.util.resourceutils import load_resource_files, get_data_from_resource
 
 
 class EnumPostRequestActions(enum.Enum):
@@ -114,23 +116,42 @@ def create_api_from_blueprint(api_name: str = "api"):
     return api_bp, api
 
 
-def create_and_run_app(api_name: str, controllers: List[Tuple[any, str]], db_config: dict,
-                       debug=False, threaded=True):
+def create_and_run_app(api_name: str, controllers: List[Tuple[any, str]], resource_list: List[str],
+                       i18n_dictionaries: List[Tuple[str, str, str]] = None, debug=False, threaded=True):
     """
     Crea una app flask. Registrará un blueprint y una api.
     :param api_name: Nombre de la api.
     :param controllers: Lista de tuplas para registrar las direcciones de los servicios de la api y sus controladores.
     El primer valor de la tupla es el objeto controlador, y el segundo es la ruta dentro de la api.
-    :param db_config: Diccionario con datos de conexión con la base de datos.
+    :param resource_list: Lista con los recursos de propiedades.
+    :param i18n_dictionaries: Lista de tuplas de tres valores. El primer valor es el iso de la lengua, el segundo valor
+    es el nombre del fichero sin la extensión, el tercero la ruta en que se encuentran. Por ejemplo: la ruta completa
+    podría ser esta (desde la raíz del proyecto): resources/locales/fr_FR/diccionario.mo: el primero valor sería
+    'fr_FR', el segundo sería './resources/locales' y el tercero sería 'diccionario'.
     :param debug: Si true, activado modo debug. DEBE ser False para producción.
     :param threaded: Si true, aplicación multihilo.
     :return: Devuelve una app_rest de flask con la api y sus rutas registradas usando un blueprint.
     """
+    # Cargar recursos de propiedades.
+    load_resource_files(resource_list=resource_list)
+
+    # Establecer valores para BaseDao: datos de conexión con la base de datos y pool de conexiones.
+    db_config = {
+        'host': get_data_from_resource("host"),
+        'user': get_data_from_resource("username"),
+        'password': get_data_from_resource("password"),
+        'database': get_data_from_resource("dbname")
+    }
+
     # Configurar conexión de base dao
     # Esto va a modificar un atributo de clase de BaseDao: la idea es que estas apis se encapsulen en un virtualenv
     # para que sean independientes unas de otras, de tal modo que cada una modifique su dao y no altere el de otras
     # apis desplegadas en el mismo servidor. Esto también crea el pool de conexiones.
     BaseDao.set_db_config_values(**db_config)
+
+    # Cargar diccionarios para gettext
+    if i18n_dictionaries:
+        add_language_dictionaries(i18n_dictionaries)
 
     # Objeto app_rest de Flask
     app_rest = Flask(__name__)

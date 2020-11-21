@@ -1,15 +1,36 @@
 import gettext
 import glob
 import locale
+import os
 import pathlib
 import subprocess
+from typing import List, Tuple
 
-languages = {
+__languages = {
     # base es el nombre del fichero mo, locales es el director en donde se encuentra
-    "es_ES": gettext.translation('base', 'resources/locales', languages=['es_ES'], fallback=True),
-    "en_GB": gettext.translation('base', 'resources/locales', languages=['en_GB'], fallback=True)
+    # estas son las rutas de los ficheros de internacionalización del core. Uso la ruta relativa desde este módulo.
+    "es_ES": gettext.translation('base', os.path.abspath(os.path.dirname(__file__)) + '/../resources/locales',
+                                 languages=['es_ES'], fallback=True),
+    "en_GB": gettext.translation('base', os.path.abspath(os.path.dirname(__file__)) + '/../resources/locales',
+                                 languages=['en_GB'], fallback=True)
 }
 """Diccionario con traductores de gettext identificados por el código iso del locale"""
+
+
+# TODO Función aún no probada
+def add_language_dictionaries(i18n_dictionaries: List[Tuple[str, str, str]]):
+    """
+    Función para añadir diccionarios de internacionalización a los recursos de gettext.
+    :param i18n_dictionaries: Lista de tuplas de tres valores. El primer valor es el iso de la lengua, el segundo valor es
+    el nombre del fichero sin la extensión, el tercero la ruta en que se encuentran. Por ejemplo: la ruta completa
+    podría ser esta (desde la raíz del proyecto): resources/locales/fr_FR/diccionario.mo: el primero valor sería
+    'fr_FR', el segundo sería './resources/locales' y el tercero sería 'diccionario'.
+    :return: Nada.
+    """
+    # Recorro la lista de ficheros y los añado.
+    if i18n_dictionaries:
+        for iso, name, path_to_file in i18n_dictionaries:
+            iso: gettext.translation(name, path_to_file, languages=[iso], fallback=True)
 
 
 def change_locale(locale_iso: str):
@@ -30,7 +51,7 @@ def translate(key: str, locale_iso: str = None, *args):
     """
     # Primero obtengo el valor de la clave en los ficheros po/mo
     # Locale es una tupla, el primer valor es el código del idioma que es lo que uso en como clave del diccionario
-    result = languages[locale_iso if locale_iso is not None else locale.getlocale()[0]].gettext(key)
+    result = __languages[locale_iso if locale_iso is not None else locale.getlocale()[0]].gettext(key)
 
     # Ahora, si han llegado parámetros para sustituir los placeholders, los sustituyo en el valor obtenido
     if args:
@@ -39,6 +60,7 @@ def translate(key: str, locale_iso: str = None, *args):
     return result
 
 
+# TODO Función aún no probada
 def create_mo_files(po_files: str, prefix: str):
     """
     Compila los ficheros .po en .mo.
