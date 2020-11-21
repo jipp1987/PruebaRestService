@@ -10,6 +10,7 @@ from typing import List, Tuple
 import flask_restful
 from flask import Blueprint, request, Flask
 
+from core.dao.basedao import BaseDao
 from core.util.jsonutils import encode_object_to_json
 
 
@@ -113,31 +114,37 @@ def create_api_from_blueprint(api_name: str = "api"):
     return api_bp, api
 
 
-def create_app(api_name: str, pairs: List[Tuple[any, str]], config_object: any = None):
+def create_and_run_app(api_name: str, controllers: List[Tuple[any, str]], db_config: dict,
+                       debug=False, threaded=True):
     """
     Crea una app flask. Registrará un blueprint y una api.
     :param api_name: Nombre de la api.
-    :param pairs: Lista de tuplas para registrar las direcciones de los servicios de la api y sus controladores.
+    :param controllers: Lista de tuplas para registrar las direcciones de los servicios de la api y sus controladores.
     El primer valor de la tupla es el objeto controlador, y el segundo es la ruta dentro de la api.
-    :param config_object: Objeto python con la configuración de la app. Por defecto None.
+    :param db_config: Diccionario con datos de conexión con la base de datos.
+    :param debug: Si true, activado modo debug. DEBE ser False para producción.
+    :param threaded: Si true, aplicación multihilo.
     :return: Devuelve una app_rest de flask con la api y sus rutas registradas usando un blueprint.
     """
+    # Configurar conexión de base dao
+    # Esto va a modificar un atributo de clase de BaseDao: la idea es que estas apis se encapsulen en un virtualenv
+    # para que sean independientes unas de otras, de tal modo que cada una modifique su dao y no altere el de otras
+    # apis desplegadas en el mismo servidor. Esto también crea el pool de conexiones.
+    BaseDao.set_db_config_values(**db_config)
+
     # Objeto app_rest de Flask
     app_rest = Flask(__name__)
-
-    # Esto es para establecer una configuración de la api a partir de un objeto.
-    if config_object:
-        app_rest.config.from_object(config_object)
 
     # Registro el blueprint con la api y me traigo los dos
     api_bp, api = create_api_from_blueprint(api_name)
 
     # Definir las distintas rutas de los rest controllers y asociarles una ruta de la api
-    for a, b in pairs:
+    for a, b in controllers:
         # Primer valor, objeto controlador; segundo valor, string con el nombre de la ruta en la api
         api.add_resource(a, b)
 
     # Registro en el objeto app el blueprint
     app_rest.register_blueprint(api_bp, url_prefix=f'/{api_name}')
 
-    return app_rest
+    # Multihilo. Pero al ser un servidor para debug, es posible que sólo haya un hilo en ejecución.
+    app_rest.run(debug=debug, threaded=threaded)
