@@ -67,7 +67,7 @@ def catch_exceptions(function):
         except CustomException as c:
             # Si ya ha sido envuelta en una CustomException, que la devuelva directamente
             raise c
-        except Exception as e:
+        except Exception:
             # De esta forma obtengo información de la excepción
             exc_type, exc_instance, exc_traceback = sys.exc_info()
 

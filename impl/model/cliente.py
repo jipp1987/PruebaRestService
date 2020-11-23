@@ -20,6 +20,10 @@ class Cliente(BaseEntity):
         'saldo': (Decimal, 'saldo'),
         'tipo_cliente': (TipoCliente, 'tipoclienteid'),
     }
+    """Diccionario con los datos de los campos del modelo."""
+
+    __id_field_name = "id"
+    """Nombre del campo id en la base de datos."""
 
     # Constructor
     def __init__(self, id: int = None, codigo: str = None, nombre: str = None, apellidos: str = None,
@@ -89,7 +93,10 @@ class Cliente(BaseEntity):
 
     # FUNCIONES
     def get_model_dict(self):
-        return self.__model_dict
+        return Cliente.__model_dict
+
+    def get_id_field_name(self) -> str:
+        return Cliente.__id_field_name
 
     # equals: uso el id para saber si es el mismo cliente
     def __eq__(self, other):

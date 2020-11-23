@@ -1,8 +1,10 @@
 import abc
+import threading
 from importlib.resources import Package
+from typing import Type, Dict, Union
 
 import pymysql as pymysql
-from dbutils.pooled_db import PooledDB
+from dbutils.pooled_db import PooledDB, PooledSharedDBConnection, PooledDedicatedDBConnection
 
 from core.exception.exceptionhandler import CustomException
 
@@ -20,10 +22,15 @@ class BaseDao(object, metaclass=abc.ABCMeta):
     __POOL: PooledDB = None
     """Pool de conexiones para aplicación multihilo, nulo por defecto."""
 
+    # Esto es un atributo de clase, todas las instancias de BaseDao lo compartirán, como si fuese una variable
+    # estática.
+    __connected_threads: Dict[int, Union[PooledSharedDBConnection, PooledDedicatedDBConnection]] = {}
+    """Diccionario de hilos que ya están conectados. Es un atributo de clase porque todas las instancias de 
+    BaseService deben compartirlo, dado que los servicios asociados a los daos se llaman unos a otros."""
+
     # Constructor
     def __init__(self, table: str):
         self.__table = table
-        self._conn = None
 
     # Funciones
     @classmethod
@@ -102,35 +109,77 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                 # Deserializo el diccionario con datos para la conexión con la base de datos.
                 **cls.__db_config)
 
-    def connect(self):
+    @staticmethod
+    def __get_current_thread() -> int:
+        """
+        Devuelve un identificador del hilo actual de ejecución.
+        :return: int
+        """
+        return threading.get_ident()
+
+    def connect(self) -> bool:
+        """
+        Obtiene una conexión del pool para el hilo actual.
+        :return: True si ha tenido que conectarse, o False si no ha hecho falta porque el hilo ya tiene una conexión.
+        """
+        # Obtener id del hilo para saber si ya está conectado
+        thread_id = type(self).__get_current_thread()
+        # Creo un boolean para saber si me he tenido que conectar, con el fin de consignar la operación
+        i_had_to_connect = False
+
         """Conectarse a la base de datos."""
-        self._conn = self.__POOL.connection()
+        # Conectar (si el hilo no está ya conectado). Dado que _connected_threads es un atributo de clase, todas las
+        # instancias de BaseService lo van a compartir, con lo cual si un servicio utiliza otros dentro de una
+        # función el hilo seguirá registrado como conectado.
+        if thread_id not in type(self).__connected_threads:
+            # Guardo en el diccionario de hilos conectados una nueva conexión
+            type(self).__connected_threads[thread_id] = (type(self).__POOL.connection())
+            # Activo el Boolean para saber que me tuve que conectar
+            i_had_to_connect = True
+
+        return i_had_to_connect
 
     def disconnect(self):
         """Desconectar de la base de datos."""
+        # Obtengo el hilo actual
+        thread_id = type(self).__get_current_thread()
+
         # Esto no cierra la conexión, sólo la devuelve al pool de conexiones para que su propio hilo la use de nuevo.
         # La conexión se cierra automáticamente cuando termina el hilo.
-        self._conn.close()
+        if thread_id in type(self).__connected_threads:
+            # Cierro el hilo, aunque técnicamente el poll no lo cerrará hasta que el hilo termine
+            type(self).__connected_threads[thread_id].close()
+            # Quitar hilo del diccionario
+            type(self).__connected_threads.pop(thread_id, None)
 
     def commit(self):
         """Hace commit."""
-        if self._conn is not None:
-            self._conn.commit()
+        # Obtengo el hilo actual
+        thread_id = type(self).__get_current_thread()
+
+        if thread_id in type(self).__connected_threads:
+            type(self).__connected_threads[thread_id].commit()
         else:
             raise CustomException(i18nutils.translate("i18n_base_commonError_database_connection"))
 
     def rollback(self):
         """Hace rollback."""
-        if self._conn is not None:
-            self._conn.rollback()
+        # Obtengo el hilo actual
+        thread_id = type(self).__get_current_thread()
+
+        if thread_id in type(self).__connected_threads:
+            type(self).__connected_threads[thread_id].rollback()
         else:
             raise CustomException(i18nutils.translate("i18n_base_commonError_database_connection"))
 
     def execute_query(self, sql):
         """Crea un cursor y ejecuta una query."""
-        if self._conn is not None:
+        # Obtengo el hilo actual
+        thread_id = type(self).__get_current_thread()
+
+        if thread_id in type(self).__connected_threads:
             # Crear cursor
-            cursor = self._conn.cursor()
+            cursor = type(self).__connected_threads[thread_id].cursor()
             # Ejecutar query
             try:
                 cursor.execute(sql)
@@ -142,32 +191,32 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         else:
             raise CustomException(i18nutils.translate("i18n_base_commonError_database_connection"))
 
-    def insert(self, entity: BaseEntity):
+    def insert(self, entity: Type[BaseEntity]):
         """Insertar registros."""
         # Ejecutar query
         sql = f"insert into {self.__table} ({entity.get_field_names_as_str()}) " \
               f"values ({entity.get_field_values_as_str()}) "
         cursor = self.execute_query(sql)
         # A través del cursor, le setteo a la entidad el id asignado en la base de datos
-        setattr(entity, entity.id_field_name, cursor.lastrowid)
+        setattr(entity, entity.get_id_field_name(), cursor.lastrowid)
         # cerrar cursor
         cursor.close()
 
-    def update(self, entity: BaseEntity):
+    def update(self, entity: Type[BaseEntity]):
         """Actualizar registros."""
         # Ejecutar query
         sql = f"update {self.__table} set {entity.get_fields_with_value_as_str()} " \
-              f"where id = {getattr(entity, entity.id_field_name)}"
+              f"where id = {getattr(entity, entity.get_id_field_name())}"
         cursor = self.execute_query(sql)
         # cerrar cursor
         cursor.close()
 
-    def delete_entity(self, entity: BaseEntity):
+    def delete_entity(self, entity: Type[BaseEntity]):
         """
         Elimina una entidad de la base de datos.
         :param entity: Entidad a eliminar.
         """
-        sql = f"delete from {self.__table} where id = {getattr(entity, entity.id_field_name)}"
+        sql = f"delete from {self.__table} where id = {getattr(entity, entity.get_id_field_name())}"
         cursor = self.execute_query(sql)
         # cerrar cursor
         cursor.close()

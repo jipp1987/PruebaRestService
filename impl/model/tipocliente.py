@@ -12,6 +12,10 @@ class TipoCliente(BaseEntity):
         'codigo': (str, 'codigo'),
         'descripcion': (str, 'descripcion'),
     }
+    """Diccionario con los datos de los campos del modelo."""
+
+    __id_field_name = "id"
+    """Nombre del campo id en la base de datos."""
 
     # Constructor
     def __init__(self, id: int = None, codigo: str = None, descripcion: str = None):
@@ -47,7 +51,10 @@ class TipoCliente(BaseEntity):
 
     # FUNCIONES
     def get_model_dict(self):
-        return self.__model_dict
+        return TipoCliente.__model_dict
+
+    def get_id_field_name(self) -> str:
+        return TipoCliente.__id_field_name
 
     # equals: uso el id para saber si es el mismo tipo de cliente
     def __eq__(self, other):

@@ -64,21 +64,21 @@ class RestController(flask_restful.Resource):
     def _create_with_response(self, entity: BaseEntity):
         """Método para crear una entidad devolviendo una respuesta."""
         # Importante llamar la función dentro de una transacción
-        self.get_main_service().start_transaction(self.get_main_service().insert, entity)
+        self.get_main_service().insert(entity)
 
         return i18nutils.translate("i18n_base_common_insert_success", None, *[str(entity)])
 
     def _delete_with_response(self, entity: BaseEntity):
         """Método para borrar una entidad devolviendo una respuesta."""
         # Importante llamar la función dentro de una transacción
-        self.get_main_service().start_transaction(self.get_main_service().delete_entity, entity)
+        self.get_main_service().delete_entity(entity)
 
         return i18nutils.translate("i18n_base_common_delete_success", None, *[str(entity)])
 
     def _update_with_response(self, entity: BaseEntity):
         """Método para actualizar una entidad devolviendo una respuesta."""
         # Importante llamar la función dentro de una transacción
-        self.get_main_service().start_transaction(self.get_main_service().update, entity)
+        self.get_main_service().update(entity)
 
         return i18nutils.translate("i18n_base_common_update_success", None, *[str(entity)])
 

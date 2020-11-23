@@ -5,13 +5,8 @@ from typing import Dict, Tuple
 class BaseEntity(metaclass=abc.ABCMeta):
     """Entidad base de la que han de extender todos los objetos persistidos en la base de datos."""
 
-    def __init__(self, id_field_name: str = "id"):
-        """
-        Constructor.
-        :param id_field_name: Nombre del campo que contiene el id. Por defecto es "id".
-        """
+    def __init__(self):
         super().__init__()
-        self.id_field_name = id_field_name
 
     @classmethod
     def convert_dict_to_entity(cls, d: dict):
@@ -50,6 +45,14 @@ class BaseEntity(metaclass=abc.ABCMeta):
         return entity
 
     @abc.abstractmethod
+    def get_id_field_name(self) -> str:
+        """
+        Devuelve el nombre del campo id.
+        :return: str
+        """
+        pass
+
+    @abc.abstractmethod
     def get_model_dict(self) -> Dict[str, Tuple[type, str]]:
         """
         Devuelve un diccionario siendo la clave un String con el nombre del campo del modelo en Python, y el valor
@@ -64,11 +67,11 @@ class BaseEntity(metaclass=abc.ABCMeta):
         Devuelve una cadena con los nombres de los campos separados por comas.
         :return: Una cadena de los campos de la entidad cuyo primer valor será el campo del id.
         """
-        cadena = self.id_field_name
+        cadena = self.get_id_field_name()
         # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
         for key in self.__dict__.keys():
             # Descartar el campo que almacena el nombre del campo "id"
-            if str(key) != "idfieldname" and str(key) != self.id_field_name:
+            if str(key) != "idfieldname" and str(key) != self.get_id_field_name():
                 cadena = cadena + ", " + str(key)
 
         return cadena
@@ -81,12 +84,12 @@ class BaseEntity(metaclass=abc.ABCMeta):
         :return: str
         """
         # Si 'is_id_included', incluyo el valor del campo id, sino pongo null. Útil pasarlo como False para inserts
-        cadena = getattr(self, self.id_field_name) if is_id_included else "null"
+        cadena = getattr(self, self.get_id_field_name()) if is_id_included else "null"
 
         # Recorrer el resto de campos e ir encadenando su valor
         for key in self.__dict__.keys():
             # Descartar el campo que almacena el nombre del campo "id"
-            if str(key) != "idfieldname" and str(key) != self.id_field_name:
+            if str(key) != "idfieldname" and str(key) != self.get_id_field_name():
                 cadena = cadena + ", '" + str(getattr(self, str(key))) + "'"
 
         return cadena
@@ -97,17 +100,17 @@ class BaseEntity(metaclass=abc.ABCMeta):
         :return: str
         """
         # Empiezo por el id
-        cadena = f'{self.id_field_name} = {getattr(self, self.id_field_name)}'
+        cadena = f'{self.get_id_field_name()} = {getattr(self, self.get_id_field_name())}'
 
         # Completo con el resto
         for attr, value in self.__dict__.items():
             # Descartar el campo que almacena el nombre del campo "id"
-            if str(attr) != "idfieldname" and str(attr) != self.id_field_name:
+            if str(attr) != "idfieldname" and str(attr) != self.get_id_field_name():
                 # Si el valor es otro BaseEntity significa que es una entidad asociada mediante foreign key.
                 if isinstance(value, BaseEntity):
                     # En el mapping de la entidad, el nombre del atributo será siempre el nombre de la clase seguido
                     # de "id"
-                    cadena = f"{cadena} , {str(attr)}id = {getattr(value, value.id_field_name)}"
+                    cadena = f"{cadena} , {str(attr)}id = {getattr(value, value.get_id_field_name())}"
                 else:
                     cadena = f"{cadena} , {str(attr)} = '{value}'"
 
