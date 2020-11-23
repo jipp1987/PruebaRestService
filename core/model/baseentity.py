@@ -21,6 +21,8 @@ class BaseEntity(metaclass=abc.ABCMeta):
         # En este caso, de forma genérica, lo que hago es descomponer el diccionario en pares clave-valor con el
         # operador **. Lo que va a hacer es ir al constructor del objeto y sustituir los argumentos de éste por los
         # pares obtenidos.
+        # La siguiente línea es para ignorar un warning de parámetro inesperado que no me interesa.
+        # noinspection PyArgumentList
         entity = cls(**d)
 
         # Voy a iterar sobre los valores del objeto en función del diccionario de valores del modelo

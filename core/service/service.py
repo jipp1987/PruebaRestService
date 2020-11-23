@@ -1,6 +1,6 @@
 import abc
 import types
-from typing import Type
+from typing import Type, Dict
 
 from core.dao.basedao import BaseDao
 from core.exception.exceptionhandler import BugBarrier
@@ -15,7 +15,7 @@ class BaseService(object):
     # Llamo a la factoría de metaclases para que me "fusione" las dos metaclases que me interesan.
     __metaclass__ = makecls(BugBarrier, abc.ABCMeta)
 
-    def __init__(self, dao: BaseDao, entity_type: Type[BaseEntity]):
+    def __init__(self, dao: BaseDao = None, entity_type: Type[BaseEntity] = None):
         """
         Constructor.
         :param dao: DAO.
@@ -97,16 +97,17 @@ class BaseService(object):
         self._dao.delete_entity(entity)
 
 
-class ServiceFactory:
+class ServiceFactory(object):
     """
     Factoría de servicios, de tal modo que sólo se tendrá en el contexto de la aplicación una instancia de un servicio.
     """
 
-    services = {}
-    """Diccionario de servicios ya instanciados."""
+    __services: Dict[str, BaseService] = {}
+    """Diccionario de servicios ya instanciados. La clave es el nombre del servicio y el valor la instancia única del 
+    mismo."""
 
     @classmethod
-    def get_service(cls, class_to_instanciate: type):
+    def get_service(cls, class_to_instanciate: Type[BaseService]):
         """
         Devuelve una instancia de un servicio. Si no existe, la instancia y la guarda en el diccionario; si existe,
         devuelve la que tenga ya almacenada.
@@ -117,8 +118,8 @@ class ServiceFactory:
         class_name = class_to_instanciate.__name__
 
         # Si no existe, la creo y la almaceno en el diccionario
-        if class_name not in cls.services:
-            cls.services[class_name] = class_to_instanciate()
+        if class_name not in cls.__services:
+            cls.__services[class_name] = class_to_instanciate()
 
         # devuelvo la instancia del diccionario
-        return cls.services[class_name]
+        return cls.__services[class_name]

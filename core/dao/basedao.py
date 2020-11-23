@@ -133,6 +133,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # función el hilo seguirá registrado como conectado.
         if thread_id not in type(self).__connected_threads:
             # Guardo en el diccionario de hilos conectados una nueva conexión
+            # No hace falta especificarle a __POOL.connection() el hilo, ya lo hace automáticamente.
             type(self).__connected_threads[thread_id] = (type(self).__POOL.connection())
             # Activo el Boolean para saber que me tuve que conectar
             i_had_to_connect = True
