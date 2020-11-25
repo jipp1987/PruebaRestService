@@ -35,11 +35,11 @@ class BaseService(object):
         # Con esto compruebo que sea un método público
         if isinstance(attr, types.MethodType) and not name.startswith('_'):
             # Creo una nueva función, que en realidad es la misma pero "envuelta" en la función de iniciar transacción
-            def new_func(*args, **kwargs):
+            def transaction_func(*args, **kwargs):
                 result = self.__start_transaction(attr, *args, **kwargs)
                 return result
 
-            return new_func
+            return transaction_func
         else:
             return attr
 
@@ -49,8 +49,8 @@ class BaseService(object):
         y si sucede algo se hace rollback.
         :param function: Función miembro a ejecutar. Se accede a ella poniendo primero su nombre prececido de punto
         y el nombre del objeto al que pertenece
-        :param args: Argumentos de la función.
-        :param kwargs: Argumentos de la función que se han pasado por teclado.
+        :param args: Argumentos de la función que no se han identificado por clave.
+        :param kwargs: Argumentos de la función que se han identificado por clave.
         :return: Resultado de la función
         """
         # Creo un boolean para saber si me he tenido que conectar, con el fin de consignar la operación
@@ -84,16 +84,28 @@ class BaseService(object):
             if i_had_to_connect:
                 self._dao.disconnect()
 
-    def insert(self, entity: Type[BaseEntity]):
-        """Insertar registros."""
+    def insert(self, entity: BaseEntity):
+        """
+        Inserta un registro en la base de datos.
+        :param entity: Objeto que hereda de BaseEntity.
+        :return: Nada.
+        """
         self._dao.insert(entity)
 
-    def update(self, entity: Type[BaseEntity]):
-        """Actualizar registros."""
+    def update(self, entity: BaseEntity):
+        """
+        Actualiza un registro en la base de datos.
+        :param entity: Objeto que hereda de BaseEntity.
+        :return: Nada.
+        """
         self._dao.update(entity)
 
-    def delete_entity(self, entity: Type[BaseEntity]):
-        """Eliminar registros."""
+    def delete_entity(self, entity: BaseEntity):
+        """
+        Elimina un registro en la base de datos.
+        :param entity: Objeto que hereda de BaseEntity.
+        :return: Nada.
+        """
         self._dao.delete_entity(entity)
 
 

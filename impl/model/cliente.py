@@ -1,4 +1,3 @@
-# Modelo para tabla clientes
 from decimal import Decimal
 from typing import Dict, Tuple
 

@@ -1,7 +1,7 @@
 import abc
 import threading
 from importlib.resources import Package
-from typing import Type, Dict, Union
+from typing import Dict, Union
 
 import pymysql as pymysql
 from dbutils.pooled_db import PooledDB, PooledSharedDBConnection, PooledDedicatedDBConnection
@@ -127,7 +127,6 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # Creo un boolean para saber si me he tenido que conectar, con el fin de consignar la operación
         i_had_to_connect = False
 
-        """Conectarse a la base de datos."""
         # Conectar (si el hilo no está ya conectado). Dado que _connected_threads es un atributo de clase, todas las
         # instancias de BaseService lo van a compartir, con lo cual si un servicio utiliza otros dentro de una
         # función el hilo seguirá registrado como conectado.
@@ -192,8 +191,12 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         else:
             raise CustomException(i18nutils.translate("i18n_base_commonError_database_connection"))
 
-    def insert(self, entity: Type[BaseEntity]):
-        """Insertar registros."""
+    def insert(self, entity: BaseEntity):
+        """
+        Inserta un registro en la base de datos.
+        :param entity: Objeto que hereda de BaseEntity.
+        :return: Nada.
+        """
         # Ejecutar query
         sql = f"insert into {self.__table} ({entity.get_field_names_as_str()}) " \
               f"values ({entity.get_field_values_as_str()}) "
@@ -203,8 +206,12 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # cerrar cursor
         cursor.close()
 
-    def update(self, entity: Type[BaseEntity]):
-        """Actualizar registros."""
+    def update(self, entity: BaseEntity):
+        """
+        Actualiza un registro en la base de datos.
+        :param entity: Objeto que hereda de BaseEntity.
+        :return: Nada.
+        """
         # Ejecutar query
         sql = f"update {self.__table} set {entity.get_fields_with_value_as_str()} " \
               f"where id = {getattr(entity, entity.get_id_field_name())}"
@@ -212,10 +219,11 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # cerrar cursor
         cursor.close()
 
-    def delete_entity(self, entity: Type[BaseEntity]):
+    def delete_entity(self, entity: BaseEntity):
         """
-        Elimina una entidad de la base de datos.
-        :param entity: Entidad a eliminar.
+        Elimina un registro en la base de datos.
+        :param entity: Objeto que hereda de BaseEntity.
+        :return: Nada.
         """
         sql = f"delete from {self.__table} where id = {getattr(entity, entity.get_id_field_name())}"
         cursor = self.execute_query(sql)

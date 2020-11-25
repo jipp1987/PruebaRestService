@@ -5,9 +5,6 @@ from typing import Dict, Tuple
 class BaseEntity(metaclass=abc.ABCMeta):
     """Entidad base de la que han de extender todos los objetos persistidos en la base de datos."""
 
-    def __init__(self):
-        super().__init__()
-
     @classmethod
     def convert_dict_to_entity(cls, d: dict):
         """
@@ -69,12 +66,16 @@ class BaseEntity(metaclass=abc.ABCMeta):
         Devuelve una cadena con los nombres de los campos separados por comas.
         :return: Una cadena de los campos de la entidad cuyo primer valor será el campo del id.
         """
-        cadena = self.get_id_field_name()
+        cadena: str = self.get_id_field_name()
+
         # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
-        for key in self.__dict__.keys():
-            # Descartar el campo que almacena el nombre del campo "id"
-            if str(key) != "idfieldname" and str(key) != self.get_id_field_name():
-                cadena = cadena + ", " + str(key)
+        d = self.get_model_dict()
+        for key, value in d.items():
+            # key es un string con el nombre del campo dentro del objeto.
+            # Value es una tupla, el primer valor es el tipo de dato y el segundo el nombre del campo en la base de
+            # datos
+            if key != self.get_id_field_name():
+                cadena += ", " + value[1]
 
         return cadena
 
@@ -88,11 +89,27 @@ class BaseEntity(metaclass=abc.ABCMeta):
         # Si 'is_id_included', incluyo el valor del campo id, sino pongo null. Útil pasarlo como False para inserts
         cadena = getattr(self, self.get_id_field_name()) if is_id_included else "null"
 
-        # Recorrer el resto de campos e ir encadenando su valor
-        for key in self.__dict__.keys():
-            # Descartar el campo que almacena el nombre del campo "id"
-            if str(key) != "idfieldname" and str(key) != self.get_id_field_name():
-                cadena = cadena + ", '" + str(getattr(self, str(key))) + "'"
+        # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
+        d = self.get_model_dict()
+
+        for key, value in d.items():
+            # key es un string con el nombre del campo dentro del objeto.
+            # Value es una tupla, el primer valor es el tipo de dato y el segundo el nombre del campo en la base de
+            # datos
+            if key != self.get_id_field_name():
+                v = getattr(self, key)
+
+                # Hay que comprobar si el campo es de tipo BaseEntity, en ese caso habrá que usar el campo id de éste
+                # como valor
+                if issubclass(value[0], BaseEntity):
+                    # Con esto obtengo el valor del id del campo referenciado
+                    v = getattr(v, v.get_id_field_name())
+
+                # Si es un str, encerrarlo entre comillas simples
+                if isinstance(v, str):
+                    cadena += ", '" + str(v) + "'"
+                else:
+                    cadena += ", " + str(v)
 
         return cadena
 
@@ -104,16 +121,27 @@ class BaseEntity(metaclass=abc.ABCMeta):
         # Empiezo por el id
         cadena = f'{self.get_id_field_name()} = {getattr(self, self.get_id_field_name())}'
 
+        # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
+        d = self.get_model_dict()
+
         # Completo con el resto
-        for attr, value in self.__dict__.items():
-            # Descartar el campo que almacena el nombre del campo "id"
-            if str(attr) != "idfieldname" and str(attr) != self.get_id_field_name():
-                # Si el valor es otro BaseEntity significa que es una entidad asociada mediante foreign key.
-                if isinstance(value, BaseEntity):
-                    # En el mapping de la entidad, el nombre del atributo será siempre el nombre de la clase seguido
-                    # de "id"
-                    cadena = f"{cadena} , {str(attr)}id = {getattr(value, value.get_id_field_name())}"
+        for key, value in d.items():
+            # key es un string con el nombre del campo dentro del objeto.
+            # Value es una tupla, el primer valor es el tipo de dato y el segundo el nombre del campo en la base de
+            # datos
+            if key != self.get_id_field_name():
+                v = getattr(self, key)
+
+                # Hay que comprobar si el campo es de tipo BaseEntity, en ese caso habrá que usar el campo id de éste
+                # como valor
+                if issubclass(value[0], BaseEntity):
+                    # Con esto obtengo el valor del id del campo referenciado
+                    v = getattr(v, v.get_id_field_name())
+
+                # Si es un str, encerrarlo entre comillas simples
+                if isinstance(v, str):
+                    cadena = f"{cadena} , {value[1]} = '{v}'"
                 else:
-                    cadena = f"{cadena} , {str(attr)} = '{value}'"
+                    cadena = f"{cadena} , {value[1]} = {v}"
 
         return cadena
