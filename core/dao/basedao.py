@@ -13,6 +13,35 @@ from core.util import i18nutils
 from core.model.baseentity import BaseEntity
 
 
+class _BaseConnection(object):
+    """Clase interna para conexión con la base de datos. La idea es que por cada transacción en un hilo se crée un
+    objeto de éstos, y al final de la transacción, ya haya sido consignada o haya hecho rollback, se cierre el cursor
+    y se elimine del ámbito del programa."""
+
+    # CONSTRUCTOR
+    def __init__(self, connection: Union[PooledSharedDBConnection, PooledDedicatedDBConnection],
+                 thread_id: int):
+        self.connection = connection
+        self.thread_id = thread_id
+        # Abro un cursor para reusar durante toda la transacción.
+        self.cursor = self.connection.cursor()
+
+    # FUNCIONES
+    def commit(self):
+        """Consigna la transacción."""
+        self.connection.commit()
+
+    def close(self):
+        """Al cerrar la conexión, que primero cierre el cursor."""
+        self.cursor.close()
+        """Cierra la conexión con la base de datos."""
+        self.connection.close()
+
+    def rollback(self):
+        """Deshace todos los cambios durante la transacción."""
+        self.connection.rollback()
+
+
 class BaseDao(object, metaclass=abc.ABCMeta):
     """Dao genérico."""
 
@@ -24,9 +53,10 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
     # Esto es un atributo de clase, todas las instancias de BaseDao lo compartirán, como si fuese una variable
     # estática.
-    __connected_threads: Dict[int, Union[PooledSharedDBConnection, PooledDedicatedDBConnection]] = {}
+    __connected_threads: Dict[int, _BaseConnection] = {}
     """Diccionario de hilos que ya están conectados. Es un atributo de clase porque todas las instancias de 
-    BaseService deben compartirlo, dado que los servicios asociados a los daos se llaman unos a otros."""
+    BaseService deben compartirlo, dado que los servicios asociados a los daos se llaman unos a otros. El identificador 
+    es un entero con el ident del hilo actual, y el valor es un objeto de tipo BaseConnection."""
 
     # Constructor
     def __init__(self, table: str):
@@ -72,6 +102,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
             'charset': charset,
             'cursorclass': cursorclass
         }
+
         # Establecer pool de conexiones.
         cls.__set_pool_values(creator=creator, maxconnections=maxconnections, mincached=mincached, maxcached=maxcached,
                               maxshared=maxshared, blocking=blocking, setsession=setsession, ping=ping)
@@ -133,7 +164,8 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         if thread_id not in type(self).__connected_threads:
             # Guardo en el diccionario de hilos conectados una nueva conexión
             # No hace falta especificarle a __POOL.connection() el hilo, ya lo hace automáticamente.
-            type(self).__connected_threads[thread_id] = (type(self).__POOL.connection())
+            type(self).__connected_threads[thread_id] = _BaseConnection(connection=type(self).__POOL.connection(),
+                                                                        thread_id=thread_id)
             # Activo el Boolean para saber que me tuve que conectar
             i_had_to_connect = True
 
@@ -179,14 +211,12 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
         if thread_id in type(self).__connected_threads:
             # Crear cursor
-            cursor = type(self).__connected_threads[thread_id].cursor()
+            cursor = type(self).__connected_threads[thread_id].cursor
             # Ejecutar query
             try:
                 cursor.execute(sql)
                 return cursor
             except pymysql.Error:
-                if cursor is not None:
-                    cursor.close()
                 raise
         else:
             raise CustomException(i18nutils.translate("i18n_base_commonError_database_connection"))
