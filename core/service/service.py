@@ -43,6 +43,11 @@ class BaseService(object):
         else:
             return attr
 
+    # TODO Esto no se ha probado con una función recursiva (una función que se llame a sí misma). Sí se ha probado con
+    #  funciones que tienen dentro funciones del mismo service y de otros services, y funciona bien: sólo inicia
+    #  transacción la función principal. Si no funcionase para una función recursiva, habría que nombrar a esas
+    #  funciones de alguna manera, con un prefijo, de tal forma que se excluyan de la sobrescritura de __getattribute__,
+    #  y manejar de forma manual la transacción en dicha función.
     def __start_transaction(self, function, *args, **kwargs):
         """
         Envuelve la función dentro de un contexto transaccional: se hace commit al final si no hay problemas,
