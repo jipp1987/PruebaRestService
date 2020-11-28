@@ -1,7 +1,7 @@
 from decimal import Decimal
-from typing import Dict, Tuple
+from typing import Dict
 
-from core.model.baseentity import BaseEntity
+from core.model.modeldefinition import BaseEntity, FieldDefinition
 from impl.model.tipocliente import TipoCliente
 
 
@@ -11,23 +11,21 @@ class Cliente(BaseEntity):
     # clienteid -> id (no puedo usar el mismo nombre de campo, id es una función interna de python y no se recomienda)
     # llamar a variables de la misma forma
     # Diccionario valores modelo
-    __model_dict: Dict[str, Tuple[type, str]] = {
-        'id': (str, 'id'),
-        'codigo': (str, 'codigo'),
-        'nombre': (str, 'nombre'),
-        'apellidos': (str, 'apellidos'),
-        'saldo': (Decimal, 'saldo'),
-        'tipo_cliente': (TipoCliente, 'tipoclienteid'),
+    __model_dict: Dict[str, FieldDefinition] = {
+        'id': FieldDefinition(field_type=int, name_in_db='id', is_primary_key=True, is_mandatory=True),
+        'codigo': FieldDefinition(field_type=str, name_in_db='codigo', length_in_db=10, is_mandatory=True),
+        'nombre': FieldDefinition(field_type=str, name_in_db='nombre', length_in_db=50, is_mandatory=True),
+        'apellidos': FieldDefinition(field_type=str, name_in_db='apellidos', length_in_db=120),
+        'saldo': FieldDefinition(field_type=Decimal, name_in_db='saldo', range_in_db=(6, 2), is_mandatory=True,
+                                 default_value=Decimal(str('0'))),
+        'tipo_cliente': FieldDefinition(field_type=TipoCliente, name_in_db='tipoclienteid', is_mandatory=True,
+                                        referenced_table_name='tiposcliente'),
     }
     """Diccionario con los datos de los campos del modelo."""
 
-    __id_field_name = "id"
-    """Nombre del campo id en la base de datos."""
-
     # Constructor
     def __init__(self, id: int = None, codigo: str = None, nombre: str = None, apellidos: str = None,
-                 saldo: Decimal = None,
-                 tipo_cliente: TipoCliente = None):
+                 saldo: Decimal = None, tipo_cliente: TipoCliente = None):
         super().__init__()
         self.id = id
         self.codigo = codigo
@@ -95,7 +93,7 @@ class Cliente(BaseEntity):
         return Cliente.__model_dict
 
     def get_id_field_name(self) -> str:
-        return Cliente.__id_field_name
+        return Cliente.__model_dict.get('id').name_in_db
 
     # equals: uso el id para saber si es el mismo cliente
     def __eq__(self, other):

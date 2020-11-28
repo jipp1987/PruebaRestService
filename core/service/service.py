@@ -4,7 +4,7 @@ from typing import Type, Dict
 
 from core.dao.basedao import BaseDao
 from core.exception.exceptionhandler import BugBarrier
-from core.model.baseentity import BaseEntity
+from core.model.modeldefinition import BaseEntity
 from core.util.noconflict import makecls
 
 

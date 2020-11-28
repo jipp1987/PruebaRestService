@@ -6,7 +6,7 @@ from flask import make_response, request
 from werkzeug.local import LocalProxy
 
 from core.exception.exceptionhandler import CustomException, catch_exceptions
-from core.model.baseentity import BaseEntity
+from core.model.modeldefinition import BaseEntity
 from core.rest.apitools import EnumPostRequestActions, RequestResponse, \
     EnumHttpResponseStatusCodes, RequestBody
 from core.service.service import BaseService

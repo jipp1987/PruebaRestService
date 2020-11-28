@@ -2,7 +2,39 @@ import abc
 from typing import Dict, Tuple
 
 
-class BaseEntity(metaclass=abc.ABCMeta):
+class FieldDefinition(object):
+    """Clase para definir los campos del modelo respecto a sus equivalentes en la base de datos."""
+
+    def __init__(self, field_type: type, name_in_db: str, is_primary_key: bool = False, is_mandatory: bool = False,
+                 length_in_db: int = None, range_in_db: Tuple[int, int] = None, referenced_table_name: str = None,
+                 default_value: any = None):
+        """
+        :param field_type: Tipo de campo esperado en python.
+        :param name_in_db: Nombre del campo en la base de datos.
+        :param is_primary_key: Es o no la clave primaria.
+        :param is_mandatory: Es o no campo obligatorio.
+        :param length_in_db: Tamaño del campo esperado en la base de datos.
+        :param range_in_db: Rango del campo. Pensado para números decimales.
+        :param referenced_table_name: Nombre de tabla referenciada en caso de que sea una clave foránea.
+        :param default_value: Valor por defecto.
+        """
+        self.field_type = field_type
+        self.name_in_db = name_in_db
+        self.is_primary_key = is_primary_key
+        self.is_mandatory = is_mandatory
+        self.length_in_db = length_in_db
+        self.range_in_db = range_in_db
+        self.referenced_table_name = referenced_table_name
+        self.default_value = default_value
+
+    def __repr__(self):
+        return f'field_type = {self.field_type}, name_in_db = {self.is_primary_key}, ' \
+               f'name_in_db = {self.is_primary_key}, is_mandatory = {self.is_mandatory}, ' \
+               f'length_in_db = {self.length_in_db}, range_in_db = {self.range_in_db}, ' \
+               f'referenced_table_name = {self.referenced_table_name}, default_value = {self.default_value} '
+
+
+class BaseEntity(object, metaclass=abc.ABCMeta):
     """Entidad base de la que han de extender todos los objetos persistidos en la base de datos."""
 
     @classmethod
@@ -27,9 +59,8 @@ class BaseEntity(metaclass=abc.ABCMeta):
         # un diccionario tras la transformación, con lo cual lo que hay que hacer es llamar de forma recursiva a esta
         # función para tranformar todos los modelos anidados en objetos BaseEntity
         for key, value in entity.get_model_dict().items():
-            # El valor de la clave es una tupla con el tipo de dato y el nombre del campo en la base de datos
-            # Cojo el primer valor de la tupla, que es el tipo del campo
-            entity_type = value[0]
+            # El valor de la clave es un objeto FieldDefinition.
+            entity_type = value.field_type
 
             # Compruebo si el tipo hereda de BaseEntity
             if issubclass(entity_type, BaseEntity):
@@ -52,12 +83,11 @@ class BaseEntity(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_model_dict(self) -> Dict[str, Tuple[type, str]]:
+    def get_model_dict(self) -> Dict[str, FieldDefinition]:
         """
         Devuelve un diccionario siendo la clave un String con el nombre del campo del modelo en Python, y el valor
-        una tupla con el tipo de objeto que le corresponde en el modelo Python y un String con el nombre del campo
-        en la base de datos.
-        :return: Dict[str, Tuple[any, str]
+        un objeto FieldDefinition con la definición del campo teniendo en cuenta el modelo de la base de datos.
+        :return: Dict[str, Tuple[any, FieldDefinition]
         """
         pass
 
@@ -72,10 +102,9 @@ class BaseEntity(metaclass=abc.ABCMeta):
         d = self.get_model_dict()
         for key, value in d.items():
             # key es un string con el nombre del campo dentro del objeto.
-            # Value es una tupla, el primer valor es el tipo de dato y el segundo el nombre del campo en la base de
-            # datos
+            # Value es una objeto de tipo FieldDefinition
             if key != self.get_id_field_name():
-                cadena += ", " + value[1]
+                cadena += ", " + value.name_in_db
 
         return cadena
 
@@ -94,14 +123,13 @@ class BaseEntity(metaclass=abc.ABCMeta):
 
         for key, value in d.items():
             # key es un string con el nombre del campo dentro del objeto.
-            # Value es una tupla, el primer valor es el tipo de dato y el segundo el nombre del campo en la base de
-            # datos
+            # Value es un objeto de tipo FieldDefinition
             if key != self.get_id_field_name():
                 v = getattr(self, key)
 
                 # Hay que comprobar si el campo es de tipo BaseEntity, en ese caso habrá que usar el campo id de éste
                 # como valor
-                if issubclass(value[0], BaseEntity):
+                if issubclass(value.field_type, BaseEntity):
                     # Con esto obtengo el valor del id del campo referenciado
                     v = getattr(v, v.get_id_field_name())
 
@@ -127,21 +155,20 @@ class BaseEntity(metaclass=abc.ABCMeta):
         # Completo con el resto
         for key, value in d.items():
             # key es un string con el nombre del campo dentro del objeto.
-            # Value es una tupla, el primer valor es el tipo de dato y el segundo el nombre del campo en la base de
-            # datos
+            # Value es un objeto de tipo FieldDefinition
             if key != self.get_id_field_name():
                 v = getattr(self, key)
 
                 # Hay que comprobar si el campo es de tipo BaseEntity, en ese caso habrá que usar el campo id de éste
                 # como valor
-                if issubclass(value[0], BaseEntity):
+                if issubclass(value.field_type, BaseEntity):
                     # Con esto obtengo el valor del id del campo referenciado
                     v = getattr(v, v.get_id_field_name())
 
                 # Si es un str, encerrarlo entre comillas simples
                 if isinstance(v, str):
-                    cadena = f"{cadena} , {value[1]} = '{v}'"
+                    cadena = f"{cadena} , {value.name_in_db} = '{v}'"
                 else:
-                    cadena = f"{cadena} , {value[1]} = {v}"
+                    cadena = f"{cadena} , {value.name_in_db} = {v}"
 
         return cadena

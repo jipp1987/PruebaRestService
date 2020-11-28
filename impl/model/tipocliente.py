@@ -1,21 +1,18 @@
-from typing import Dict, Tuple
+from typing import Dict
 
-from core.model.baseentity import BaseEntity
+from core.model.modeldefinition import BaseEntity, FieldDefinition
 
 
 class TipoCliente(BaseEntity):
     """Modelo de tipo de cliente."""
 
     # Diccionario valores modelo
-    __model_dict: Dict[str, Tuple[type, str]] = {
-        'id': (str, 'id'),
-        'codigo': (str, 'codigo'),
-        'descripcion': (str, 'descripcion'),
+    __model_dict: Dict[str, FieldDefinition] = {
+        'id': FieldDefinition(field_type=int, name_in_db='id', is_primary_key=True, is_mandatory=True),
+        'codigo': FieldDefinition(field_type=str, name_in_db='codigo', length_in_db=4, is_mandatory=True),
+        'descripcion': FieldDefinition(field_type=str, name_in_db='descripcion', length_in_db=50, is_mandatory=True),
     }
     """Diccionario con los datos de los campos del modelo."""
-
-    __id_field_name = "id"
-    """Nombre del campo id en la base de datos."""
 
     # Constructor
     def __init__(self, id: int = None, codigo: str = None, descripcion: str = None):
@@ -54,7 +51,7 @@ class TipoCliente(BaseEntity):
         return TipoCliente.__model_dict
 
     def get_id_field_name(self) -> str:
-        return TipoCliente.__id_field_name
+        return TipoCliente.__model_dict.get('id').name_in_db
 
     # equals: uso el id para saber si es el mismo tipo de cliente
     def __eq__(self, other):

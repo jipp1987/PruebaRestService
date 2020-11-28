@@ -10,7 +10,7 @@ from core.exception.exceptionhandler import CustomException
 
 from core.util import i18nutils
 
-from core.model.baseentity import BaseEntity
+from core.model.modeldefinition import BaseEntity
 
 
 class _BaseConnection(object):
