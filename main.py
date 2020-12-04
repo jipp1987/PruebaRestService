@@ -7,7 +7,7 @@ if __name__ == "__main__":
     # datos de conexión: host, user, password, database.
     resource_list = ['./resources/db.properties']
 
-    # Lista de pares de valores: primero valor la ruta de la api, segundo valor el controlador de dicha ruta
+    # Lista de pares de valores: primer valor la ruta de la api, segundo valor el controlador de dicha ruta
     controllers = [(TipoClienteRestController, "/TipoCliente"), (ClienteRestController, "/Cliente")]
 
     # Crear y ejecutar app

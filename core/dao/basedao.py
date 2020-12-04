@@ -1,11 +1,12 @@
 import abc
 import threading
 from importlib.resources import Package
-from typing import Dict, Union
+from typing import Dict, Union, List
 
 import pymysql as pymysql
 from dbutils.pooled_db import PooledDB, PooledSharedDBConnection, PooledDedicatedDBConnection
 
+from core.dao.querytools import FilterClause, OrderByClause, EnumSQLOperationTypes
 from core.exception.exceptionhandler import CustomException
 
 from core.util import i18nutils
@@ -22,19 +23,29 @@ class _BaseConnection(object):
     def __init__(self, connection: Union[PooledSharedDBConnection, PooledDedicatedDBConnection],
                  thread_id: int):
         self.connection = connection
+        """Objeto de conexión."""
         self.thread_id = thread_id
+        """Identificador del hilo."""
         # Abro un cursor para reusar durante toda la transacción.
-        self.cursor = self.connection.cursor()
+        self.cursor = None
+        """Cursor SQL."""
+        self.open_cursor()
 
     # FUNCIONES
+    def open_cursor(self):
+        """Abre un cursor."""
+        if self.connection:
+            self.cursor = self.connection.cursor()
+
     def commit(self):
         """Consigna la transacción."""
         self.connection.commit()
 
     def close(self):
-        """Al cerrar la conexión, que primero cierre el cursor."""
+        """Cierra cursor y conexión."""
+        # Al cerrar la conexión, que primero cierre el cursor.
         self.cursor.close()
-        """Cierra la conexión con la base de datos."""
+        # Cierra la conexión con la base de datos.
         self.connection.close()
 
     def rollback(self):
@@ -204,18 +215,29 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         else:
             raise CustomException(i18nutils.translate("i18n_base_commonError_database_connection"))
 
-    def execute_query(self, sql):
+    def execute_query(self, sql, sql_operation_type: EnumSQLOperationTypes = None):
         """Crea un cursor y ejecuta una query."""
         # Obtengo el hilo actual
         thread_id = type(self).__get_current_thread()
 
         if thread_id in type(self).__connected_threads:
-            # Crear cursor
+            # Obtener cursor
             cursor = type(self).__connected_threads[thread_id].cursor
+
             # Ejecutar query
             try:
                 cursor.execute(sql)
-                return cursor
+
+                # Dependiendo del tipo de operación, podría ser necesario devolver algún valor
+                if sql_operation_type:
+                    if sql_operation_type == EnumSQLOperationTypes.INSERT:
+                        return cursor.lastrowid
+                    elif sql_operation_type == EnumSQLOperationTypes.SELECT_ONE:
+                        return cursor.fetchone()
+                    elif sql_operation_type == EnumSQLOperationTypes.SELECT_MANY:
+                        return cursor.fetchall()
+                    else:
+                        return None
             except pymysql.Error:
                 raise
         else:
@@ -230,11 +252,9 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # Ejecutar query
         sql = f"insert into {self.__table} ({entity.get_field_names_as_str()}) " \
               f"values ({entity.get_field_values_as_str()}) "
-        cursor = self.execute_query(sql)
+        index = self.execute_query(sql, sql_operation_type=EnumSQLOperationTypes.INSERT)
         # A través del cursor, le setteo a la entidad el id asignado en la base de datos
-        setattr(entity, entity.get_id_field_name(), cursor.lastrowid)
-        # cerrar cursor
-        cursor.close()
+        setattr(entity, entity.get_id_field_name(), index)
 
     def update(self, entity: BaseEntity):
         """
@@ -245,9 +265,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # Ejecutar query
         sql = f"update {self.__table} set {entity.get_fields_with_value_as_str()} " \
               f"where id = {getattr(entity, entity.get_id_field_name())}"
-        cursor = self.execute_query(sql)
-        # cerrar cursor
-        cursor.close()
+        self.execute_query(sql)
 
     def delete_entity(self, entity: BaseEntity):
         """
@@ -256,6 +274,48 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         :return: Nada.
         """
         sql = f"delete from {self.__table} where id = {getattr(entity, entity.get_id_field_name())}"
-        cursor = self.execute_query(sql)
-        # cerrar cursor
-        cursor.close()
+        self.execute_query(sql)
+
+    def find_by_filtered_query(self, filters: List[FilterClause], order: List[OrderByClause]) -> List[BaseEntity]:
+        if filters:
+            # Creo un array de strings y luego lo concateno con join. Es la forma más eficiente para generar el filtro
+            # desde las listas.
+            filtro_arr = []
+
+            # Para recorrer los listados, voy a usar un iterador, que es más eficiente.
+            iterator = iter(filters)
+            done_looping = False
+            while not done_looping:
+                try:
+                    item = next(iterator)
+                except StopIteration:
+                    done_looping = True
+                else:
+                    # Añadir tantos paréntesis de inicio como diga el objeto
+                    start_parenthesis = ''
+                    if item.start_parenthesis:
+                        for p in range(item.start_parenthesis):
+                            start_parenthesis += '('
+
+                    # Añadir tantos paréntesis de fin como diga el objeto
+                    end_parenthesis = ''
+                    if item.end_parenthesis:
+                        for p in range(item.end_parenthesis):
+                            end_parenthesis += ')'
+
+                    # Objeto a comparar
+                    if isinstance(item.object_to_compare, str):
+                        compare = f"'{item.object_to_compare}'"
+                    else:
+                        compare = f"{str(item.object_to_compare)}"
+
+                    # Crear filtro
+                    filtro_arr.append(f"{start_parenthesis}{item.field_name} {item.filter_type.filter_operator} "
+                                      f"{compare}{end_parenthesis}")
+
+            # Unir los filtros
+            filtro = ''.join(filtro_arr)
+
+            # Ejecutar query
+            sql = f"SELECT FROM {self.__table} WHERE {filtro}"
+            return self.execute_query(sql, sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)
