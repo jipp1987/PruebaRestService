@@ -6,12 +6,15 @@ from typing import Dict, Union, List
 import pymysql as pymysql
 from dbutils.pooled_db import PooledDB, PooledSharedDBConnection, PooledDedicatedDBConnection
 
-from core.dao.querytools import FilterClause, OrderByClause, EnumSQLOperationTypes
+from core.dao.querytools import FilterClause, OrderByClause, EnumSQLOperationTypes, resolve_filter_clause, \
+    resolve_order_by_clause, JoinClause, resolve_join_clause, GroupByClause, resolve_group_by_clause, FieldClause, \
+    resolve_field_clause
 from core.exception.exceptionhandler import CustomException
 
 from core.util import i18nutils
 
 from core.model.modeldefinition import BaseEntity
+from core.util.listutils import optimized_for_loop
 
 
 class _BaseConnection(object):
@@ -148,7 +151,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                 blocking=blocking,
                 setsession=setsession,
                 ping=ping,
-                # Deserializo el diccionario con datos para la conexión con la base de datos.
+                # Descompongo el diccionario con datos para la conexión con la BD.
                 **cls.__db_config)
 
     @staticmethod
@@ -276,46 +279,73 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         sql = f"delete from {self.__table} where id = {getattr(entity, entity.get_id_field_name())}"
         self.execute_query(sql)
 
-    def find_by_filtered_query(self, filters: List[FilterClause], order: List[OrderByClause]) -> List[BaseEntity]:
+    def find_by_filtered_query(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
+                               order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
+                               group_by: List[GroupByClause] = None,
+                               offset: int = None, limit: int = None) -> List[BaseEntity]:
+        # Resuelto SELECT (por defecto, asterisco para todos los campos)
+        select = '*'
+        if fields:
+            # Creo un array de strings y luego lo concateno con join. Es la forma más eficiente para generar el filtro
+            # desde las listas.
+            fields_arr = []
+            # Uso una función para bucle for optimizado.
+            optimized_for_loop(fields, resolve_field_clause, fields_arr)
+            # Unir los fields
+            select = ''.join(fields_arr)
+
+        # Resuelvo filtros
+        filtro = ''
         if filters:
             # Creo un array de strings y luego lo concateno con join. Es la forma más eficiente para generar el filtro
             # desde las listas.
             filtro_arr = []
-
-            # Para recorrer los listados, voy a usar un iterador, que es más eficiente.
-            iterator = iter(filters)
-            done_looping = False
-            while not done_looping:
-                try:
-                    item = next(iterator)
-                except StopIteration:
-                    done_looping = True
-                else:
-                    # Añadir tantos paréntesis de inicio como diga el objeto
-                    start_parenthesis = ''
-                    if item.start_parenthesis:
-                        for p in range(item.start_parenthesis):
-                            start_parenthesis += '('
-
-                    # Añadir tantos paréntesis de fin como diga el objeto
-                    end_parenthesis = ''
-                    if item.end_parenthesis:
-                        for p in range(item.end_parenthesis):
-                            end_parenthesis += ')'
-
-                    # Objeto a comparar
-                    if isinstance(item.object_to_compare, str):
-                        compare = f"'{item.object_to_compare}'"
-                    else:
-                        compare = f"{str(item.object_to_compare)}"
-
-                    # Crear filtro
-                    filtro_arr.append(f"{start_parenthesis}{item.field_name} {item.filter_type.filter_operator} "
-                                      f"{compare}{end_parenthesis}")
-
+            # Uso una función para bucle for optimizado.
+            optimized_for_loop(filters, resolve_filter_clause, filtro_arr)
             # Unir los filtros
             filtro = ''.join(filtro_arr)
 
-            # Ejecutar query
-            sql = f"SELECT FROM {self.__table} WHERE {filtro}"
-            return self.execute_query(sql, sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)
+        # Resuelvo joins
+        join = ''
+        if joins:
+            # Creo un array de strings y luego lo concateno con join. Es la forma más eficiente para generar el filtro
+            # desde las listas.
+            join_arr = []
+            # Uso una función para bucle for optimizado.
+            optimized_for_loop(joins, resolve_join_clause, join_arr)
+            # Unir los joins
+            join = ''.join(join_arr)
+
+        # Resuelvo group
+        group = ''
+        if group_by:
+            # Creo un array de strings y luego lo concateno con join. Es la forma más eficiente para generar el filtro
+            # desde las listas.
+            group_by_arr = []
+            # Uso una función para bucle for optimizado.
+            optimized_for_loop(group_by, resolve_group_by_clause, group_by_arr)
+            # Unir los groups
+            group = ''.join(group_by_arr)
+
+        # Resuelvo order bys
+        orden = ''
+        if order_by:
+            # Creo un array de strings y luego lo concateno con join. Es la forma más eficiente para generar el filtro
+            # desde las listas.
+            order_by_arr = []
+            # Uso una función para bucle for optimizado.
+            optimized_for_loop(order_by, resolve_order_by_clause, order_by_arr)
+            # Unir los ordenby
+            orden = ''.join(order_by_arr)
+
+        # Resuelvo offset y limit
+        limit_offset = ''
+        if limit is not None:
+            if offset is not None:
+                limit_offset = f'{str(offset)}, {str(limit)}'
+            else:
+                limit_offset = f'{str(limit)}'
+
+        # Ejecutar query
+        sql = f"SELECT {select} FROM {self.__table} {join} {filtro} {group} {orden} {limit_offset}".strip()
+        return self.execute_query(sql, sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)

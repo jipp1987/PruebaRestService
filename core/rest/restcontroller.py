@@ -107,26 +107,36 @@ class RestController(flask_restful.Resource):
         # Primero transformo el objeto json de LocalProxy a string json
         json_format = encode_object_to_json(request_proxy.get_json())
         # Luego transformo el string json a un objeto RequestBody, pasando el tipo como parámetro
-        request_body = decode_object_to_json(json_format, RequestBody)
-        # Convertir objeto de request a entidad base
-        entity = self.get_main_service().entity_type.convert_dict_to_entity(request_body.request_object)
+        request_body: RequestBody = decode_object_to_json(json_format, RequestBody)
         # Resolver acción
-        return self._resolve_action(entity, request_body.action)
+        return self._resolve_action(request_body.action, request_body.request_object)
 
-    def _resolve_action(self, entity: BaseEntity, action: int):
+    def __convert_request_object_to_base_entity(self, request_object: any) -> BaseEntity:
+        """
+        Convierte el objeto json de la petición en una BaseEntity. Pensado para crear, modificar y eliminar.
+        :param request_object: Objecto request que va a convertirse en BaseEntity.
+        :return: BaseEntity
+        """
+        return self.get_main_service().entity_type.convert_dict_to_entity(request_object)
+
+    def _resolve_action(self, action: int, request_object: any):
         """
         Método que resuelve la acción a realizar en post a través del RequestBody, en concreto de un int con la acción
         seleccionada. Las implementaciones de RestController que lo necesiten pueden sobrescribir esta función.
-        :param entity: Entidad.
+        :param action: Entero con una acción a resolver.
         1 -> Crear
         2 -> Actualizar
         3 -> Borrar
         4 -> Seleccionar
-        :param action: Entero con una acción a resolver.
         :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
         """
         # Comprobar la acción enviada en la Request
         request_action = EnumPostRequestActions(action)
+
+        # Si request_action distinto de "select", preparar una BaseEntity
+        entity = None
+        if request_action != EnumPostRequestActions.SELECT:
+            entity = self.__convert_request_object_to_base_entity(request_object)
 
         result = None
         if request_action == EnumPostRequestActions.CREATE:
@@ -137,7 +147,7 @@ class RestController(flask_restful.Resource):
             result = self._update_with_response(entity)
         else:
             # TODO Implementar select
-            # result = self._select_with_response()
+            # result = self._update_with_response()
             pass
 
         return result
@@ -145,7 +155,8 @@ class RestController(flask_restful.Resource):
     def post(self):
         """
         Método post de controller rest. NO se recomienda su sobrescritura. Si lo que se desea es
-        sobrescribir el comportamiento de RestController, lo mejor es sobrescribir _resolve_action.
+        sobrescribir el comportamiento de RestController, lo mejor es sobrescribir _resolve_action o mejor aún
+        _create_with_response, _delete_with_response, _update_with_response o _update_with_response, según proceda.
         :return: Cadena con mensaje formateado para devolver al solicitante.
         """
         try:

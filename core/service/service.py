@@ -1,6 +1,6 @@
 import abc
 import types
-from typing import Type, Dict
+from typing import Type, Dict, Callable
 
 from core.dao.basedao import BaseDao
 from core.exception.exceptionhandler import BugBarrier
@@ -48,7 +48,7 @@ class BaseService(object):
     #  transacción la función principal. Si no funcionase para una función recursiva, habría que nombrar a esas
     #  funciones de alguna manera, con un prefijo, de tal forma que se excluyan de la sobrescritura de __getattribute__,
     #  y manejar de forma manual la transacción en dicha función.
-    def __start_transaction(self, function, *args, **kwargs):
+    def __start_transaction(self, function: Callable, *args, **kwargs):
         """
         Envuelve la función dentro de un contexto transaccional: se hace commit al final si no hay problemas,
         y si sucede algo se hace rollback.

@@ -70,9 +70,13 @@ class RequestBody:
                  request_object: any = None):
         super().__init__()
         self.username = username
+        """Nombre de usuario para token de autenticación."""
         self.password = password
+        """Password de usuario para token de autenticación."""
         self.action = action
+        """Acción a realizar."""
         self.request_object = request_object
+        """Objeto de la request. Puede ser un BaseEntity, una lista de filtros..."""
 
 
 class RequestResponse:
