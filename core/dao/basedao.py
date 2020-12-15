@@ -283,6 +283,18 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                                order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
                                group_by: List[GroupByClause] = None,
                                offset: int = None, limit: int = None) -> List[BaseEntity]:
+        """
+        Ejecuta una consulta SELECT sobre la tabla principal del dao.
+        :param fields: Campos seleccionados.
+        :param filters: Filtros.
+        :param order_by: Cláusulas ORDER BY.
+        :param joins: Cláusulas JOIN.
+        :param group_by: Cláusulas GROUP BY.
+        :param offset: Offset del límite de la consulta.
+        :param limit: Límite de registros.
+        :return: Lista de entidades encontradas.
+        """
+
         # Resuelto SELECT (por defecto, asterisco para todos los campos)
         select = '*'
         if fields:
@@ -342,10 +354,10 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         limit_offset = ''
         if limit is not None:
             if offset is not None:
-                limit_offset = f'{str(offset)}, {str(limit)}'
+                limit_offset = f'LIMIT {str(offset)}, {str(limit)}'
             else:
-                limit_offset = f'{str(limit)}'
+                limit_offset = f'LIMIT {str(limit)}'
 
         # Ejecutar query
-        sql = f"SELECT {select} FROM {self.__table} {join} {filtro} {group} {orden} {limit_offset}".strip()
+        sql = f"SELECT {select} FROM {self.__table} {join} {filtro} {group} {orden} {limit_offset}"
         return self.execute_query(sql, sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)

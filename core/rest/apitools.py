@@ -5,6 +5,7 @@ JSON, códigos de estado http...
 """
 
 import enum
+from dataclasses import dataclass
 from typing import List, Tuple
 
 import flask_restful
@@ -79,15 +80,12 @@ class RequestBody:
         """Objeto de la request. Puede ser un BaseEntity, una lista de filtros..."""
 
 
+@dataclass(init=True, frozen=True)
 class RequestResponse:
     """Objeto de respuesta de request."""
-
-    def __init__(self, message: str, success: bool, status_code: int = None, response_object: any = None):
-        super().__init__()
-        self.message = message
-        self.success = success
-        self.status_code = status_code
-        self.response_object = response_object
+    success: bool
+    status_code: int
+    response_object: any
 
 
 def create_api_from_blueprint(api_name: str = "api"):
@@ -109,7 +107,7 @@ def create_api_from_blueprint(api_name: str = "api"):
     @api_bp.app_errorhandler(EnumHttpResponseStatusCodes.SERVER_ERROR.value)
     def _handle_api_error(ex):
         if request.path.startswith(f'/{api_name}/'):
-            response = RequestResponse(ex.description, success=False, status_code=ex.code)
+            response = RequestResponse(response_object=ex.description, success=False, status_code=ex.code)
             return encode_object_to_json(response)
         else:
             return ex

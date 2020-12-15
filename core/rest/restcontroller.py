@@ -1,10 +1,12 @@
 import abc
 from functools import wraps
+from typing import List
 
 import flask_restful
 from flask import make_response, request
 from werkzeug.local import LocalProxy
 
+from core.dao.querytools import JsonQuery
 from core.exception.exceptionhandler import CustomException, catch_exceptions
 from core.model.modeldefinition import BaseEntity
 from core.rest.apitools import EnumPostRequestActions, RequestResponse, \
@@ -82,9 +84,24 @@ class RestController(flask_restful.Resource):
 
         return i18nutils.translate("i18n_base_common_update_success", None, *[str(entity)])
 
-    def _select_with_response(self):
+    def _select_with_response(self, query_object: JsonQuery):
         """Método para seleccionar datos de una tabla."""
-        pass
+        # query_object se construye a partir de un diccionario, y es posible que una instancia no tenga ciertos
+        # atributos. Voy comprobando si los tiene uno a uno y si no paso None como argumento
+        filters = query_object.filters if hasattr(query_object, 'filters') else None
+        order = query_object.order if hasattr(query_object, 'order') else None
+        fields = query_object.fields if hasattr(query_object, 'fields') else None
+        group_by = query_object.group_by if hasattr(query_object, 'group_by') else None
+        joins = query_object.joins if hasattr(query_object, 'joins') else None
+        offset = query_object.offset if hasattr(query_object, 'offset') else None
+        limit = query_object.limit if hasattr(query_object, 'limit') else None
+
+        # Hago la consulta
+        result: List[BaseEntity] = self.get_main_service().find_by_filtered_query(filters=filters, order_by=order,
+                                                                                  fields=fields, group_by=group_by,
+                                                                                  joins=joins, offset=offset,
+                                                                                  limit=limit)
+        return result
 
     @staticmethod
     def _convert_request_response_to_json_response(response_body: RequestResponse):
@@ -135,10 +152,13 @@ class RestController(flask_restful.Resource):
 
         # Si request_action distinto de "select", preparar una BaseEntity
         entity = None
+        query_object = None
         if request_action != EnumPostRequestActions.SELECT:
             entity = self.__convert_request_object_to_base_entity(request_object)
+        else:
+            # El objeto QueryObject espera un diccionario como argumento del constructor para inicializar sus atributos
+            query_object = JsonQuery(request_object)
 
-        result = None
         if request_action == EnumPostRequestActions.CREATE:
             result = self._create_with_response(entity)
         elif request_action == EnumPostRequestActions.DELETE:
@@ -146,9 +166,7 @@ class RestController(flask_restful.Resource):
         elif request_action == EnumPostRequestActions.UPDATE:
             result = self._update_with_response(entity)
         else:
-            # TODO Implementar select
-            # result = self._update_with_response()
-            pass
+            result = self._select_with_response(query_object)
 
         return result
 
@@ -163,14 +181,15 @@ class RestController(flask_restful.Resource):
             # Obtengo datos json de la petición
             result = self.__resolve_action_outer(request)
             # Devuelvo una respuesta correcta
-            response_body = RequestResponse(result, success=True, status_code=EnumHttpResponseStatusCodes.OK.value)
+            response_body = RequestResponse(response_object=result, success=True,
+                                            status_code=EnumHttpResponseStatusCodes.OK.value)
 
             return self._convert_request_response_to_json_response(response_body)
         except CustomException as e:
             # Se produce algún error
             print(str(e))
             result = i18nutils.translate("i18n_base_commonError_request", None, *[e.known_error])
-            response_body = RequestResponse(result, success=False,
+            response_body = RequestResponse(response_object=result, success=False,
                                             status_code=EnumHttpResponseStatusCodes.BAD_REQUEST.value)
 
             return self._convert_request_response_to_json_response(response_body)

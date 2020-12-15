@@ -1,8 +1,9 @@
 import abc
 import types
-from typing import Type, Dict, Callable
+from typing import Type, Dict, Callable, List
 
 from core.dao.basedao import BaseDao
+from core.dao.querytools import FieldClause, FilterClause, JoinClause, OrderByClause, GroupByClause
 from core.exception.exceptionhandler import BugBarrier
 from core.model.modeldefinition import BaseEntity
 from core.util.noconflict import makecls
@@ -112,6 +113,24 @@ class BaseService(object):
         :return: Nada.
         """
         self._dao.delete_entity(entity)
+
+    def find_by_filtered_query(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
+                               order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
+                               group_by: List[GroupByClause] = None,
+                               offset: int = None, limit: int = None) -> List[BaseEntity]:
+        """
+        Ejecuta una consulta SELECT sobre la tabla principal del dao.
+        :param fields: Campos seleccionados.
+        :param filters: Filtros.
+        :param order_by: Cláusulas ORDER BY.
+        :param joins: Cláusulas JOIN.
+        :param group_by: Cláusulas GROUP BY.
+        :param offset: Offset del límite de la consulta.
+        :param limit: Límite de registros.
+        :return: Lista de entidades encontradas.
+        """
+        return self._dao.find_by_filtered_query(filters=filters, order_by=order_by, fields=fields, group_by=group_by,
+                                                joins=joins, offset=offset, limit=limit)
 
 
 class ServiceFactory(object):

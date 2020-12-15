@@ -1,6 +1,5 @@
 import enum
 from collections import namedtuple
-from dataclasses import dataclass
 from typing import List
 
 from core.util.listutils import LoopIterationObject
@@ -60,17 +59,20 @@ class EnumOperatorTypes(enum.Enum):
 class FilterClause(object):
     """Clase para modelado de cláusulas WHERE para MySQL."""
 
-    def __init__(self, field_name: str, filter_type: EnumFilterTypes, object_to_compare: any, table_alias: str,
-                 operator_type: EnumOperatorTypes = None, start_parenthesis: int = None, end_parenthesis: int = None):
+    def __init__(self, field_name: str, filter_type: (EnumFilterTypes, str), object_to_compare: any, table_alias: str,
+                 operator_type: (EnumOperatorTypes, str) = None, start_parenthesis: int = None,
+                 end_parenthesis: int = None):
         self.field_name = field_name
         """Nombre del campo."""
-        self.filter_type = filter_type
+        self.filter_type = filter_type if isinstance(filter_type, EnumFilterTypes) else EnumFilterTypes[filter_type]
         """Tipo de filtro."""
         self.object_to_compare = object_to_compare
         """Objeto a comparar."""
         self.table_alias = table_alias
         """Alias de la tabla."""
-        self.operator_type = operator_type if operator_type is not None else EnumOperatorTypes.AND
+        self.operator_type = (operator_type if isinstance(operator_type, EnumOperatorTypes)
+                              else EnumOperatorTypes[operator_type]) if operator_type is not None \
+            else EnumOperatorTypes.AND
         """Tipo de operador que conecta con el filtro inmediatamente anterior. Si null, se asume que es AND."""
         self.start_parenthesis = start_parenthesis
         """Número de paréntesis al principio."""
@@ -102,14 +104,35 @@ def resolve_filter_clause(iteration_object: LoopIterationObject, filtro_arr: Lis
             for p in range(item.end_parenthesis):
                 end_parenthesis += ')'
 
-        # Objeto a comparar
-        if isinstance(item.object_to_compare, str):
-            compare = f"'{item.object_to_compare}'"
-        else:
-            compare = f"{str(item.object_to_compare)}"
+        # Tratar el tipo de filtro
+        compare = None
+        if item.filter_type == EnumFilterTypes.LIKE or item.filter_type == EnumFilterTypes.NOT_LIKE:
+            # Filtro LIKE: poner comodín % al principio y al final
+            compare = f"%{item.object_to_compare}%"
+        elif item.filter_type == EnumFilterTypes.IN or EnumFilterTypes.NOT_IN:
+            # Filtro IN y NOT IN: el objeto a comparar es una lista, concatenar los elementos por comas
+            if len(item.object_to_compare) > 1:
+                for idx, i in enumerate(item.object_to_compare):
+                    # Si el objeto es string, encerrarlo entre comillas simples
+                    element = f"'{i}'" if isinstance(i, str) else str(i)
 
-        # TODO Tratamiento del tipo de filtro
-        # if item.filter_type == EnumFilterTypes.IN or EnumFilterTypes.NOT_IN or EnumFilterTypes.BETWEEN:
+                    # Según sea el primer elemento, el último o del medio, tratarlo
+                    if idx == 0:
+                        # Primer elemento
+                        compare = f"({element}"
+                    elif idx == len(item.object_to_compare) - 1:
+                        # Último elemento
+                        compare = f", {element})"
+                    else:
+                        compare = f", {element}"
+            else:
+                compare = f"({str(item.object_to_compare[0])})"
+        else:
+            # En cualquier otro caso, forma de string
+            compare = str(item.object_to_compare)
+
+        # Si el objeto a comparar es un string, encerrarlo entre comillas simples
+        compare = f"'{compare}'" if isinstance(item.object_to_compare, str) else compare
 
         # Crear filtro
         # Me guardo el operador para concatenar filtros en una variable, para que sea más legible el código
@@ -269,17 +292,106 @@ def resolve_field_clause(iteration_object: LoopIterationObject, select_arr: List
         select_arr.append(f"{item.table_alias}.{item.field_name} {(' ' if is_last else ', ')} ")
 
 
-# OBJETO QUERY
-@dataclass(init=True)
-class QueryObject(object):
-    """Clase para el modelado de consultas. Contiene distintos tipos de objetos para fabricar la query."""
-    # Lista de filtros.
-    filters: List[FilterClause]
-    # Lista de order by.
-    order: List[OrderByClause]
-    # Lista de joins.
-    joins: List[JoinClause]
-    # Lista de group bys.
-    group_by: List[GroupByClause]
-    # Lista de campos.
-    fields: List[FieldClause]
+class JsonQuery(object):
+    """Clase para el modelado de consultas desde JSON. Contiene distintos tipos de objetos para fabricar la query."""
+
+    # La clase se inicializa a partir de un diccionario, este objeto está pensado para la recepción de filtros desde
+    # json
+    def __init__(self, d: dict):
+        for a, b in d.items():
+            # Comprobar si el valor es una instancia de lista o tupla
+            if isinstance(b, (list, tuple)):
+                # Para cada elemento de la lista o tupla, comprobar si es un diccionario. Si lo es, llamar
+                # recursivamente a este constructor.
+                setattr(self, a, [JsonQuery(x) if isinstance(x, dict) else x for x in b])
+            else:
+                # Si no lo es, igualmente comprobar si es un diccionario para llamar recursivamente a este constructor.
+                setattr(self, a, JsonQuery(b) if isinstance(b, dict) else b)
+
+    # PROPIEDADES Y SETTERS
+    # Este objeto se crea desde un diccionario. En lugar de declarar los campos en el constructor, es mejor usar setters
+    # para convertir las claves del diccionario en el objeto deseado. Si en el json string no viene una clave, el
+    # atributo no existe en el objeto final. Por eso, luego se ha de tratar si este objeto tiene un atributo
+    # determinado. NO asignar None a los atributos: si nos fijamos en el constructor, estoy usando
+    # siempre un objeto JsonQuery y luego uso el atributo __dict__ del mismo para añadir objetos FilterClause,
+    # JoinClause... a cada listado; si tuviese un atributo que no existe en alguno de estas clases (aunque sea None),
+    # se produciría un error.
+    @property
+    def filters(self) -> List[FilterClause]:
+        """Lista de filtros."""
+        return self.__filters
+
+    @filters.setter
+    def filters(self, filters):
+        if isinstance(filters, list) and filters:
+            self.__filters = [] # noqa
+            for f in filters:
+                self.__filters.append(FilterClause(**f.__dict__))
+
+    @property
+    def order(self) -> List[OrderByClause]:
+        """Lista de order by."""
+        return self.__order
+
+    @order.setter
+    def order(self, order):
+        if isinstance(order, list) and order:
+            self.__order = [] # noqa
+            for f in order:
+                self.__order.append(OrderByClause(**f.__dict__))
+
+    @property
+    def joins(self) -> List[JoinClause]:
+        """Lista de joins."""
+        return self.__joins
+
+    @joins.setter
+    def joins(self, joins):
+        if isinstance(joins, list) and joins:
+            self.__joins = [] # noqa
+            for f in joins:
+                self.__joins.append(JoinClause(**f.__dict__))
+
+    @property
+    def group_by(self) -> List[GroupByClause]:
+        """Lista de group by."""
+        return self.__group_by
+
+    @group_by.setter
+    def group_by(self, group_by):
+        if isinstance(group_by, list) and group_by:
+            self.__group_by = [] # noqa
+            for f in group_by:
+                self.__group_by.append(GroupByClause(**f.__dict__))
+
+    @property
+    def fields(self) -> List[FieldClause]:
+        """Lista de campos del SELECT."""
+        return self.__fields
+
+    @fields.setter
+    def fields(self, fields):
+        if isinstance(fields, list) and fields:
+            self.__fields = [] # noqa
+            for f in fields:
+                self.__fields.append(FieldClause(**f.__dict__))
+
+    @property
+    def offset(self) -> int:
+        """Offset del limit."""
+        return self.__offset
+
+    @offset.setter
+    def offset(self, offset):
+        if isinstance(offset, int):
+            self.__offset = offset # noqa
+
+    @property
+    def limit(self) -> int:
+        """Límite de la consulta."""
+        return self.__limit
+
+    @limit.setter
+    def limit(self, limit):
+        if isinstance(limit, int):
+            self.__limit = limit # noqa
