@@ -8,7 +8,7 @@ from dbutils.pooled_db import PooledDB, PooledSharedDBConnection, PooledDedicate
 
 from core.dao.querytools import FilterClause, OrderByClause, EnumSQLOperationTypes, resolve_filter_clause, \
     resolve_order_by_clause, JoinClause, resolve_join_clause, GroupByClause, resolve_group_by_clause, FieldClause, \
-    resolve_field_clause
+    resolve_field_clause, resolve_limit_offset
 from core.exception.exceptionhandler import CustomException
 
 from core.util import i18nutils
@@ -353,11 +353,9 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # Resuelvo offset y limit
         limit_offset = ''
         if limit is not None:
-            if offset is not None:
-                limit_offset = f'LIMIT {str(offset)}, {str(limit)}'
-            else:
-                limit_offset = f'LIMIT {str(limit)}'
+            limit_offset = resolve_limit_offset(limit=limit, offset=offset)
 
         # Ejecutar query
-        sql = f"SELECT {select} FROM {self.__table} {join} {filtro} {group} {orden} {limit_offset}"
+        sql = f"SELECT {select.strip()} FROM {self.__table} {join.strip()} {filtro.strip()} {group.strip()} " \
+              f"{orden.strip()} {limit_offset.strip()}"
         return self.execute_query(sql, sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)

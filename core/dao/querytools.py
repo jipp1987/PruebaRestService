@@ -90,7 +90,7 @@ def resolve_filter_clause(iteration_object: LoopIterationObject, filtro_arr: Lis
     if filtro_arr is not None:
         # Desde el objeto de iteración obtengo los valores para operar en la función
         item: FilterClause = iteration_object.item
-        is_last: bool = iteration_object.is_last
+        is_first: bool = iteration_object.is_first
 
         # Añadir tantos paréntesis de inicio como diga el objeto
         start_parenthesis = ''
@@ -132,14 +132,15 @@ def resolve_filter_clause(iteration_object: LoopIterationObject, filtro_arr: Lis
             compare = str(item.object_to_compare)
 
         # Si el objeto a comparar es un string, encerrarlo entre comillas simples
-        compare = f"'{compare}'" if isinstance(item.object_to_compare, str) else compare
+        compare = f'\'{compare}\'' if isinstance(item.object_to_compare, str) else compare
 
         # Crear filtro
         # Me guardo el operador para concatenar filtros en una variable, para que sea más legible el código
         operator: str = item.operator_type.operator_keyword
-        filtro_arr.append(f"{'WHERE ' if not filtro_arr else (' ' if is_last else f' {operator} ')}"
+        filter_too_add = (f"{'WHERE ' if is_first else f' {operator} '}"
                           f"{start_parenthesis}{item.table_alias}.{item.field_name} {item.filter_type.filter_keyword} "
                           f"{compare}{end_parenthesis}")
+        filtro_arr.append(filter_too_add)
 
 
 # ORDER BYs
@@ -162,10 +163,11 @@ class EnumOrderByTypes(enum.Enum):
 class OrderByClause(object):
     """Clase para modelado de cláusulas ORDER BY para MySQL."""
 
-    def __init__(self, field_name: str, order_by_type: EnumOrderByTypes, table_alias: str):
+    def __init__(self, field_name: str, order_by_type: (EnumOrderByTypes, str), table_alias: str):
         self.field_name = field_name
         """Nombre del campo."""
-        self.order_by_type = order_by_type
+        self.order_by_type = order_by_type if isinstance(order_by_type, EnumOrderByTypes) \
+            else EnumOrderByTypes[order_by_type]
         """Tipo de cláusula ORDER BY."""
         self.table_alias = table_alias
         """Alias de la tabla."""
@@ -182,10 +184,10 @@ def resolve_order_by_clause(iteration_object: LoopIterationObject, order_by_arr:
     if order_by_arr is not None:
         # Desde el objeto de iteración obtengo los valores para operar en la función
         item: OrderByClause = iteration_object.item
-        is_last: bool = iteration_object.is_last
+        is_first: bool = iteration_object.is_first
 
         # Crear order by: si es el primero de la lista, añadir cláusula ORDER BY, sino añadir coma (si no es el último)
-        order_by_arr.append(f"{'ORDER BY ' if not order_by_arr else (' ' if is_last else ', ')}"
+        order_by_arr.append(f"{'ORDER BY ' if is_first else ', '}"
                             f"{item.table_alias}.{item.field_name} {item.order_by_type.order_by_keyword}")
 
 
@@ -210,10 +212,10 @@ class EnumJoinTypes(enum.Enum):
 class JoinClause(object):
     """Clase para modelado de cláusulas JOIN para MySQL."""
 
-    def __init__(self, table_name: str, join_type: EnumJoinTypes, table_alias: str = None):
+    def __init__(self, table_name: str, join_type: (EnumJoinTypes, str), table_alias: str = None):
         self.table_name = table_name
         """Nombre de la tabla hacia la que se va a hacer join."""
-        self.join_type = join_type
+        self.join_type = join_type if isinstance(join_type, EnumJoinTypes) else EnumJoinTypes[join_type]
         """Tipo de cláusula JOIN."""
         self.table_alias = table_alias if table_alias is not None else self.table_name
         """Alias de la tabla. Si no se ha pasado como parámetro en el constructor, el alias de la tabla es el nombre 
@@ -258,10 +260,10 @@ def resolve_group_by_clause(iteration_object: LoopIterationObject, group_by_arr:
     if group_by_arr is not None:
         # Desde el objeto de iteración obtengo los valores para operar en la función
         item: GroupByClause = iteration_object.item
-        is_last: bool = iteration_object.is_last
+        is_first: bool = iteration_object.is_first
 
         # Crear group by: si es el primero de la lista, añadir cláusula GROUP BY, sino añadir coma (si no es el último)
-        group_by_arr.append(f"{'GROUP BY ' if not group_by_arr else (' ' if is_last else ', ')}"
+        group_by_arr.append(f"{'GROUP BY ' if is_first else ', '}"
                             f"{item.table_alias}.{item.field_name} ")
 
 
@@ -288,8 +290,24 @@ def resolve_field_clause(iteration_object: LoopIterationObject, select_arr: List
         # Desde el objeto de iteración obtengo los valores para operar en la función
         item: FieldClause = iteration_object.item
         is_last: bool = iteration_object.is_last
+
         # Añadir campo a la SELECT, si no es el último añadir comas
-        select_arr.append(f"{item.table_alias}.{item.field_name} {(' ' if is_last else ', ')} ")
+        select_arr.append(f"{item.table_alias}.{item.field_name} {('' if is_last else ', ')} ")
+
+
+def resolve_limit_offset(limit: int, offset: int = None) -> str:
+    """
+    Devuelve un string con la cláusula limit (con offset opcional.)
+    :param limit: Límite de registros de la consulta.
+    :param offset: Índice inferior desde el que comenzar la consulta.
+    :return: Cláusula LIMIT.
+    """
+    if offset is not None:
+        limit_offset = f'LIMIT {str(offset)}, {str(limit)}'
+    else:
+        limit_offset = f'LIMIT {str(limit)}'
+
+    return limit_offset
 
 
 class JsonQuery(object):

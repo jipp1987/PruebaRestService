@@ -33,6 +33,7 @@ def optimized_for_loop(list_to_loop: List[any], function: Callable, *args, **kwa
     iterator: any = iter(list_to_loop)
     done_looping: bool = False
     return_object: any = None
+    loop_object: LoopIterationObject
 
     while not done_looping:
         try:
@@ -43,7 +44,8 @@ def optimized_for_loop(list_to_loop: List[any], function: Callable, *args, **kwa
             # El primer parámetro de la función pasada como argumento ha de ser de tipo LoopIterationObject: el primer
             # valor es el item de la iteración, el segundo un bool que indica si es el primer elemento de la lista y
             # el tercero otro bool que indica si es el último elemento de la lista.
-            return_object = function(LoopIterationObject(item, item is list_to_loop[0], item is list_to_loop[-1]),
-                                     *args, **kwargs)
+            loop_object = LoopIterationObject(item=item, is_first=item is list_to_loop[0],
+                                              is_last=item is list_to_loop[-1])
+            return_object = function(loop_object, *args, **kwargs)
 
     return return_object
