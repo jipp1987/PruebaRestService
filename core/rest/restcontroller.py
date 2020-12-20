@@ -86,21 +86,14 @@ class RestController(flask_restful.Resource):
 
     def _select_with_response(self, query_object: JsonQuery):
         """Método para seleccionar datos de una tabla."""
-        # query_object se construye a partir de un diccionario, y es posible que una instancia no tenga ciertos
-        # atributos. Voy comprobando si los tiene uno a uno y si no paso None como argumento
-        filters = query_object.filters if hasattr(query_object, 'filters') else None
-        order = query_object.order if hasattr(query_object, 'order') else None
-        fields = query_object.fields if hasattr(query_object, 'fields') else None
-        group_by = query_object.group_by if hasattr(query_object, 'group_by') else None
-        joins = query_object.joins if hasattr(query_object, 'joins') else None
-        offset = query_object.offset if hasattr(query_object, 'offset') else None
-        limit = query_object.limit if hasattr(query_object, 'limit') else None
-
         # Hago la consulta
-        result: List[BaseEntity] = self.get_main_service().find_by_filtered_query(filters=filters, order_by=order,
-                                                                                  fields=fields, group_by=group_by,
-                                                                                  joins=joins, offset=offset,
-                                                                                  limit=limit)
+        result: List[BaseEntity] = self.get_main_service().find_by_filtered_query(filters=query_object.filters,
+                                                                                  order_by=query_object.order,
+                                                                                  fields=query_object.fields,
+                                                                                  group_by=query_object.group_by,
+                                                                                  joins=query_object.joins,
+                                                                                  offset=query_object.offset,
+                                                                                  limit=query_object.limit)
         return result
 
     @staticmethod

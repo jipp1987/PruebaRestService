@@ -316,24 +316,24 @@ class JsonQuery(object):
     # La clase se inicializa a partir de un diccionario, este objeto está pensado para la recepción de filtros desde
     # json
     def __init__(self, d: dict):
+        # Declaro los campos como None
+        self.__filters = None
+        self.__order = None
+        self.__joins = None
+        self.__group_by = None
+        self.__fields = None
+        self.__offset = None
+        self.__limit = None
+
+        # Recorrer diccionario estableciendo valores
         for a, b in d.items():
-            # Comprobar si el valor es una instancia de lista o tupla
-            if isinstance(b, (list, tuple)):
-                # Para cada elemento de la lista o tupla, comprobar si es un diccionario. Si lo es, llamar
-                # recursivamente a este constructor.
-                setattr(self, a, [JsonQuery(x) if isinstance(x, dict) else x for x in b])
-            else:
-                # Si no lo es, igualmente comprobar si es un diccionario para llamar recursivamente a este constructor.
-                setattr(self, a, JsonQuery(b) if isinstance(b, dict) else b)
+            setattr(self, a, b)
 
     # PROPIEDADES Y SETTERS
-    # Este objeto se crea desde un diccionario. En lugar de declarar los campos en el constructor, es mejor usar setters
-    # para convertir las claves del diccionario en el objeto deseado. Si en el json string no viene una clave, el
-    # atributo no existe en el objeto final. Por eso, luego se ha de tratar si este objeto tiene un atributo
-    # determinado. NO asignar None a los atributos: si nos fijamos en el constructor, estoy usando
-    # siempre un objeto JsonQuery y luego uso el atributo __dict__ del mismo para añadir objetos FilterClause,
-    # JoinClause... a cada listado; si tuviese un atributo que no existe en alguno de estas clases (aunque sea None),
-    # se produciría un error.
+    # Este objeto se crea desde un json: por ello, en el constructor sólo se pasa un diccionario. Uso getters y setters
+    # para establecer el valor desde éste y que las propiedades salgan con los tipos que necesito. Lo que hago es usar
+    # el operador ** para descomponer cada elemento del listado (que python lo interpreta de json como un diccionario)
+    # para que usar pares clave/valor para los argumentos del constructor de cada clase.
     @property
     def filters(self) -> List[FilterClause]:
         """Lista de filtros."""
@@ -342,9 +342,9 @@ class JsonQuery(object):
     @filters.setter
     def filters(self, filters):
         if isinstance(filters, list) and filters:
-            self.__filters = [] # noqa
+            self.__filters = []
             for f in filters:
-                self.__filters.append(FilterClause(**f.__dict__))
+                self.__filters.append(FilterClause(**f))
 
     @property
     def order(self) -> List[OrderByClause]:
@@ -354,9 +354,9 @@ class JsonQuery(object):
     @order.setter
     def order(self, order):
         if isinstance(order, list) and order:
-            self.__order = [] # noqa
+            self.__order = []
             for f in order:
-                self.__order.append(OrderByClause(**f.__dict__))
+                self.__order.append(OrderByClause(**f))
 
     @property
     def joins(self) -> List[JoinClause]:
@@ -366,9 +366,9 @@ class JsonQuery(object):
     @joins.setter
     def joins(self, joins):
         if isinstance(joins, list) and joins:
-            self.__joins = [] # noqa
+            self.__joins = []
             for f in joins:
-                self.__joins.append(JoinClause(**f.__dict__))
+                self.__joins.append(JoinClause(**f))
 
     @property
     def group_by(self) -> List[GroupByClause]:
@@ -378,9 +378,9 @@ class JsonQuery(object):
     @group_by.setter
     def group_by(self, group_by):
         if isinstance(group_by, list) and group_by:
-            self.__group_by = [] # noqa
+            self.__group_by = []
             for f in group_by:
-                self.__group_by.append(GroupByClause(**f.__dict__))
+                self.__group_by.append(GroupByClause(**f))
 
     @property
     def fields(self) -> List[FieldClause]:
@@ -390,9 +390,9 @@ class JsonQuery(object):
     @fields.setter
     def fields(self, fields):
         if isinstance(fields, list) and fields:
-            self.__fields = [] # noqa
+            self.__fields = []
             for f in fields:
-                self.__fields.append(FieldClause(**f.__dict__))
+                self.__fields.append(FieldClause(**f))
 
     @property
     def offset(self) -> int:
@@ -402,7 +402,7 @@ class JsonQuery(object):
     @offset.setter
     def offset(self, offset):
         if isinstance(offset, int):
-            self.__offset = offset # noqa
+            self.__offset = offset
 
     @property
     def limit(self) -> int:
@@ -412,4 +412,4 @@ class JsonQuery(object):
     @limit.setter
     def limit(self, limit):
         if isinstance(limit, int):
-            self.__limit = limit # noqa
+            self.__limit = limit
