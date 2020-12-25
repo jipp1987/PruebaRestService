@@ -10,7 +10,7 @@ class TipoClienteService(BaseService):
     # Constructor
     def __init__(self):
         # de esta forma llamo al constructor del padre
-        super().__init__(dao=TipoClienteDao(), entity_type=TipoCliente)
+        super().__init__(dao=TipoClienteDao())
 
 
 class ClienteService(BaseService):
@@ -19,4 +19,4 @@ class ClienteService(BaseService):
     # Constructor
     def __init__(self):
         # de esta forma llamo al constructor del padre
-        super().__init__(dao=ClienteDao(), entity_type=Cliente)
+        super().__init__(dao=ClienteDao())

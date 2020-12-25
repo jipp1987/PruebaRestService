@@ -1,7 +1,9 @@
 import abc
+from dataclasses import dataclass
 from typing import Dict, Tuple
 
 
+@dataclass(repr=True, init=False)
 class FieldDefinition(object):
     """Clase para definir los campos del modelo respecto a sus equivalentes en la base de datos."""
 
@@ -18,20 +20,14 @@ class FieldDefinition(object):
         :param referenced_table_name: Nombre de tabla referenciada en caso de que sea una clave foránea.
         :param default_value: Valor por defecto.
         """
-        self.field_type = field_type
-        self.name_in_db = name_in_db
-        self.is_primary_key = is_primary_key
-        self.is_mandatory = is_mandatory
-        self.length_in_db = length_in_db
-        self.range_in_db = range_in_db
-        self.referenced_table_name = referenced_table_name
-        self.default_value = default_value
-
-    def __repr__(self):
-        return f'field_type = {self.field_type}, name_in_db = {self.is_primary_key}, ' \
-               f'name_in_db = {self.is_primary_key}, is_mandatory = {self.is_mandatory}, ' \
-               f'length_in_db = {self.length_in_db}, range_in_db = {self.range_in_db}, ' \
-               f'referenced_table_name = {self.referenced_table_name}, default_value = {self.default_value} '
+        self.field_type: type = field_type
+        self.name_in_db: str = name_in_db
+        self.is_primary_key: bool = is_primary_key
+        self.is_mandatory: bool = is_mandatory
+        self.length_in_db: int = length_in_db
+        self.range_in_db: Tuple[int, int] = range_in_db
+        self.referenced_table_name: str = referenced_table_name
+        self.default_value: any = default_value
 
 
 class BaseEntity(object, metaclass=abc.ABCMeta):
@@ -90,6 +86,20 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         :return: Dict[str, Tuple[any, FieldDefinition]
         """
         pass
+
+    def to_json(self) -> Dict[str, any]:
+        """Serializa la entidad a json."""
+        # Devuelvo un diccionario sólo con los valores del correspondiente al modelo de datos.
+        json_dict = {}
+
+        d = self.get_model_dict()
+        v: any
+        for key, value in d.items():
+            # Codifico cada valor a json (compruebo si ya tiene una función to_json)
+            v = getattr(self, key)
+            json_dict[key] = v.to_json() if hasattr(v, "to_json") else v
+
+        return json_dict
 
     def get_field_names_as_str(self):
         """

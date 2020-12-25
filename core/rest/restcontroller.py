@@ -13,7 +13,7 @@ from core.rest.apitools import EnumPostRequestActions, RequestResponse, \
     EnumHttpResponseStatusCodes, RequestBody
 from core.service.service import BaseService
 from core.util import i18nutils
-from core.util.jsonutils import encode_object_to_json, decode_object_to_json
+from core.util.jsonutils import encode_object_to_json, decode_object_from_json
 from core.util.noconflict import makecls
 
 
@@ -117,7 +117,7 @@ class RestController(flask_restful.Resource):
         # Primero transformo el objeto json de LocalProxy a string json
         json_format = encode_object_to_json(request_proxy.get_json())
         # Luego transformo el string json a un objeto RequestBody, pasando el tipo como parámetro
-        request_body: RequestBody = decode_object_to_json(json_format, RequestBody)
+        request_body: RequestBody = decode_object_from_json(json_format, RequestBody)
         # Resolver acción
         return self._resolve_action(request_body.action, request_body.request_object)
 
@@ -127,7 +127,7 @@ class RestController(flask_restful.Resource):
         :param request_object: Objecto request que va a convertirse en BaseEntity.
         :return: BaseEntity
         """
-        return self.get_main_service().entity_type.convert_dict_to_entity(request_object)
+        return self.get_main_service().get_entity_type().convert_dict_to_entity(request_object)
 
     def _resolve_action(self, action: int, request_object: any):
         """

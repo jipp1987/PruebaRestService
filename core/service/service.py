@@ -22,10 +22,8 @@ class BaseService(object):
         :param dao: DAO.
         :param entity_type: Tipo de entidad.
         """
-        # Tienen un dao asociado
         self._dao = dao
-        # Tipo de entidad
-        self.entity_type = entity_type
+        """Acceso a datos asociado al servicio."""
 
     # Sobrescribo __getattribute__ para interceptar las llamadas a las funciones con el objetivo de envolverlas
     # automáticamente en transacciones, a modo de interceptor de llamadas a funciones.
@@ -43,6 +41,13 @@ class BaseService(object):
             return transaction_func
         else:
             return attr
+
+    def get_entity_type(self) -> type(BaseEntity):
+        """
+        Devuelve el tipo de entidad usando el dao asociado.
+        :return: Tipo de entidad.
+        """
+        return self._dao.entity_type
 
     # TODO Esto no se ha probado con una función recursiva (una función que se llame a sí misma). Sí se ha probado con
     #  funciones que tienen dentro funciones del mismo service y de otros services, y funciona bien: sólo inicia

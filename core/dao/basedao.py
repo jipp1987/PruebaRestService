@@ -73,8 +73,11 @@ class BaseDao(object, metaclass=abc.ABCMeta):
     es un entero con el ident del hilo actual, y el valor es un objeto de tipo BaseConnection."""
 
     # Constructor
-    def __init__(self, table: str):
+    def __init__(self, table: str, entity_type: type(BaseEntity)):
         self.__table = table
+        """Nombre de la tabla principal."""
+        self.entity_type = entity_type
+        """Tipo de entidad."""
 
     # Funciones
     @classmethod
@@ -358,4 +361,13 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # Ejecutar query
         sql = f"SELECT {select.strip()} FROM {self.__table} {join.strip()} {filtro.strip()} {group.strip()} " \
               f"{orden.strip()} {limit_offset.strip()}"
-        return self.execute_query(sql, sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)
+        # El resultado es una lista de  diccionarios, pero hay que transformarlo en modelo de datos
+        result_as_dict: dict = self.execute_query(sql=sql, sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)
+
+        # Recorrer lista de diccionarios e ir transformando cada valor en una entidad base
+        result: List[BaseEntity] = []
+        if result_as_dict:
+            for v in result_as_dict:
+                result.append(self.entity_type.convert_dict_to_entity(v))
+
+        return result

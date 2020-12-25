@@ -1,4 +1,6 @@
 from core.dao.basedao import BaseDao
+from impl.model.cliente import Cliente
+from impl.model.tipocliente import TipoCliente
 
 
 class TipoClienteDao(BaseDao):
@@ -7,7 +9,7 @@ class TipoClienteDao(BaseDao):
     # Constructor
     def __init__(self):
         # de esta forma llamo al constructor del padre
-        super().__init__("tiposcliente")
+        super().__init__(table="tiposcliente", entity_type=TipoCliente)
 
 
 class ClienteDao(BaseDao):
@@ -16,4 +18,4 @@ class ClienteDao(BaseDao):
     # Constructor
     def __init__(self):
         # de esta forma llamo al constructor del padre
-        super().__init__("clientes")
+        super().__init__(table="clientes", entity_type=Cliente)

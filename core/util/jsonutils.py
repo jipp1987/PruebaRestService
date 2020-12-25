@@ -41,7 +41,7 @@ def encode_object_to_json(object_to_encode: any) -> str:
                       ensure_ascii=False)
 
 
-def decode_object_to_json(json_format: str, t: type) -> any:
+def decode_object_from_json(json_format: str, t: type) -> any:
     """
     Transforma un string formato json a una instancia de un objeto.
     :param json_format: String formato json.
