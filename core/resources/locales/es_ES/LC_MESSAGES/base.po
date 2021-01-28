@@ -34,3 +34,6 @@ msgstr "Se ha producido un error procesando la petición: %s"
 
 msgid "i18n_base_knownError_operationalError"
 msgstr "Se ha producido un error con alguno de los campos del objeto."
+
+msgid "i18n_base_commonError_query_translate"
+msgstr "Se produjo un error con una cláusula durante la traducción de la consulta: %s."

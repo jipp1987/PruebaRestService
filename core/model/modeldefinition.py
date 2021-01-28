@@ -54,7 +54,7 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         # Lo hago porque al transformar un diccionario en un modelo, si tiene otro modelo anidado éste sigue siendo
         # un diccionario tras la transformación, con lo cual lo que hay que hacer es llamar de forma recursiva a esta
         # función para tranformar todos los modelos anidados en objetos BaseEntity
-        for key, value in entity.get_model_dict().items():
+        for key, value in type(entity).get_model_dict().items():
             # El valor de la clave es un objeto FieldDefinition.
             entity_type = value.field_type
 
@@ -70,16 +70,18 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
 
         return entity
 
+    @classmethod
     @abc.abstractmethod
-    def get_id_field_name(self) -> str:
+    def get_id_field_name(cls) -> str:
         """
         Devuelve el nombre del campo id.
         :return: str
         """
         pass
 
+    @classmethod
     @abc.abstractmethod
-    def get_model_dict(self) -> Dict[str, FieldDefinition]:
+    def get_model_dict(cls) -> Dict[str, FieldDefinition]:
         """
         Devuelve un diccionario siendo la clave un String con el nombre del campo del modelo en Python, y el valor
         un objeto FieldDefinition con la definición del campo teniendo en cuenta el modelo de la base de datos.
@@ -92,7 +94,7 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         # Devuelvo un diccionario sólo con los valores del correspondiente al modelo de datos.
         json_dict = {}
 
-        d = self.get_model_dict()
+        d = type(self).get_model_dict()
         v: any
         for key, value in d.items():
             # Codifico cada valor a json (compruebo si ya tiene una función to_json)
@@ -106,14 +108,14 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         Devuelve una cadena con los nombres de los campos separados por comas.
         :return: Una cadena de los campos de la entidad cuyo primer valor será el campo del id.
         """
-        cadena: str = self.get_id_field_name()
+        cadena: str = type(self).get_id_field_name()
 
         # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
-        d = self.get_model_dict()
+        d = type(self).get_model_dict()
         for key, value in d.items():
             # key es un string con el nombre del campo dentro del objeto.
             # Value es una objeto de tipo FieldDefinition
-            if key != self.get_id_field_name():
+            if key != type(self).get_id_field_name():
                 cadena += ", " + value.name_in_db
 
         return cadena
@@ -126,22 +128,22 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         :return: str
         """
         # Si 'is_id_included', incluyo el valor del campo id, sino pongo null. Útil pasarlo como False para inserts
-        cadena = getattr(self, self.get_id_field_name()) if is_id_included else "null"
+        cadena = getattr(self, type(self).get_id_field_name()) if is_id_included else "null"
 
         # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
-        d = self.get_model_dict()
+        d = type(self).get_model_dict()
 
         for key, value in d.items():
             # key es un string con el nombre del campo dentro del objeto.
             # Value es un objeto de tipo FieldDefinition
-            if key != self.get_id_field_name():
+            if key != type(self).get_id_field_name():
                 v = getattr(self, key)
 
                 # Hay que comprobar si el campo es de tipo BaseEntity, en ese caso habrá que usar el campo id de éste
                 # como valor
                 if issubclass(value.field_type, BaseEntity):
                     # Con esto obtengo el valor del id del campo referenciado
-                    v = getattr(v, v.get_id_field_name())
+                    v = getattr(v, type(v).get_id_field_name())
 
                 # Si es un str, encerrarlo entre comillas simples
                 if isinstance(v, str):
@@ -157,23 +159,23 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         :return: str
         """
         # Empiezo por el id
-        cadena = f'{self.get_id_field_name()} = {getattr(self, self.get_id_field_name())}'
+        cadena = f'{type(self).get_id_field_name()} = {getattr(self, type(self).get_id_field_name())}'
 
         # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
-        d = self.get_model_dict()
+        d = type(self).get_model_dict()
 
         # Completo con el resto
         for key, value in d.items():
             # key es un string con el nombre del campo dentro del objeto.
             # Value es un objeto de tipo FieldDefinition
-            if key != self.get_id_field_name():
+            if key != type(self).get_id_field_name():
                 v = getattr(self, key)
 
                 # Hay que comprobar si el campo es de tipo BaseEntity, en ese caso habrá que usar el campo id de éste
                 # como valor
                 if issubclass(value.field_type, BaseEntity):
                     # Con esto obtengo el valor del id del campo referenciado
-                    v = getattr(v, v.get_id_field_name())
+                    v = getattr(v, type(v).get_id_field_name())
 
                 # Si es un str, encerrarlo entre comillas simples
                 if isinstance(v, str):

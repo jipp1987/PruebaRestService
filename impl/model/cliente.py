@@ -89,11 +89,13 @@ class Cliente(BaseEntity):
         self.__tipo_cliente = tipo_cliente
 
     # FUNCIONES
-    def get_model_dict(self):
-        return Cliente.__model_dict
+    @classmethod
+    def get_model_dict(cls):
+        return cls.__model_dict
 
-    def get_id_field_name(self) -> str:
-        return Cliente.__model_dict.get('id').name_in_db
+    @classmethod
+    def get_id_field_name(cls) -> str:
+        return cls.__model_dict.get('id').name_in_db
 
     # equals: uso el id para saber si es el mismo cliente
     def __eq__(self, other):

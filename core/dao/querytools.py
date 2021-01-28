@@ -109,7 +109,7 @@ def resolve_filter_clause(iteration_object: LoopIterationObject, filtro_arr: Lis
         if item.filter_type == EnumFilterTypes.LIKE or item.filter_type == EnumFilterTypes.NOT_LIKE:
             # Filtro LIKE: poner comodín % al principio y al final
             compare = f"%{item.object_to_compare}%"
-        elif item.filter_type == EnumFilterTypes.IN or EnumFilterTypes.NOT_IN:
+        elif item.filter_type == EnumFilterTypes.IN or item.filter_type == EnumFilterTypes.NOT_IN:
             # Filtro IN y NOT IN: el objeto a comparar es una lista, concatenar los elementos por comas
             if len(item.object_to_compare) > 1:
                 for idx, i in enumerate(item.object_to_compare):
@@ -212,14 +212,20 @@ class EnumJoinTypes(enum.Enum):
 class JoinClause(object):
     """Clase para modelado de cláusulas JOIN para MySQL."""
 
-    def __init__(self, table_name: str, join_type: (EnumJoinTypes, str), table_alias: str = None):
+    def __init__(self, table_name: str, join_type: (EnumJoinTypes, str), parent_table: str,
+                 parent_table_referenced_column_name: str, table_alias: str = None, id_column_name: str = "id"):
         self.table_name = table_name
         """Nombre de la tabla hacia la que se va a hacer join."""
         self.join_type = join_type if isinstance(join_type, EnumJoinTypes) else EnumJoinTypes[join_type]
         """Tipo de cláusula JOIN."""
-        self.table_alias = table_alias if table_alias is not None else self.table_name
-        """Alias de la tabla. Si no se ha pasado como parámetro en el constructor, el alias de la tabla es el nombre 
-        de la tabla."""
+        self.table_alias = table_alias
+        """Alias de la tabla."""
+        self.parent_table = parent_table
+        """Tabla padre."""
+        self.parent_table_referenced_column_name = parent_table_referenced_column_name
+        """Nombre de la columna referenciada en la tabla padre."""
+        self.id_column_name = id_column_name
+        """Nombre de la columna id de la tabla a enlazar."""
 
 
 def resolve_join_clause(iteration_object: LoopIterationObject, join_arr: List[str]):
@@ -233,9 +239,10 @@ def resolve_join_clause(iteration_object: LoopIterationObject, join_arr: List[st
     if join_arr is not None:
         # Desde el objeto de iteración obtengo los valores para operar en la función
         item: JoinClause = iteration_object.item
-
         # Crear join
-        join_arr.append(f"{item.join_type.join_keyword} {item.table_name} {item.table_alias} ")
+        join_arr.append(f"{item.join_type.join_keyword} {item.table_name} {item.table_alias} "
+                        f"ON {item.table_alias}.{item.id_column_name} = "
+                        f"{item.parent_table}.{item.parent_table_referenced_column_name}")
 
 
 # GROUP BYs
