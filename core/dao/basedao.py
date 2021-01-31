@@ -1,8 +1,10 @@
 import abc
 import copy
+import gc
 import threading
+from collections import OrderedDict
 from importlib.resources import Package
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Tuple, Type
 
 import pymysql as pymysql
 from dbutils.pooled_db import PooledDB, PooledSharedDBConnection, PooledDedicatedDBConnection
@@ -283,11 +285,15 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         sql = f"delete from {self.__table} where id = {getattr(entity, type(entity).get_id_field_name())}"
         self.__execute_query_internal(sql)
 
-    def __resolve_translation_of_clauses(self, clause_type: type, clauses_list: list, is_join_clause: bool = False):
+    def __resolve_translation_of_clauses(self, clause_type: type, clauses_list: list,
+                                         join_alias_table_name: Dict[str, Tuple[type, str, Union[str, None]]],
+                                         is_join_clause: bool = False):
         """
         Resuelve la traducción de select, filtros, order_by y group_by.
         :param clause_type: Tipo de cláusula.
         :param clauses_list: Lista de cláusulas a traducir.
+        :param join_alias_table_name: Diccionario empleado para mantener una relación entre los alias de las tablas y
+        el nombre del campo en Python.
         :param is_join_clause: Si es un join, utiliza otro campo por el que hacer el split. False por defecto.
         :return: Lista de filtros, order, group o fields traducidos a mysql.
         """
@@ -298,15 +304,18 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         new_table_alias: Union[str, None]
         field_name_array: List[str]
         field_name_array_last_index: int
-        # Esto lo uso para los joins, para poder mantenerlos relacionados. La clave es el nombre del campo y el valor
-        # es el nombre real de la tabla en la base de datos.
+        entity_type: Union[Type[BaseEntity], None]
+
         join_parent_table_dict: Dict[str, str]
+        """Esto lo uso para los joins, para poder mantenerlos relacionados. La clave es el nombre del campo y el valor 
+        es el nombre real de la tabla en la base de datos."""
 
         for f in clauses_list:
             # Copio el objeto entrante
             new_clause = copy.deepcopy(f)
             field_definition = None
             new_table_alias = None
+            entity_type = None
 
             # Si el campo viene con este formato: campo_tabla_1.campo_tabla_2.campo_tabla_3... significa que es
             # un campo de una clase anidada en el modelo.
@@ -325,7 +334,8 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                         # El primero será el de la propia clase del DAO actual
                         field_definition = self.entity_type.get_model_dict().get(val)
                     elif idx < field_name_array_last_index:
-                        # A partir de ahí,
+                        # Voy almacenando la última definición de campo para reutilizarla justo antes de resolver el
+                        # último valor.
                         field_definition = field_definition.field_type.get_model_dict().get(val)  # noqa
                     else:
                         # En último índice, antes de volver a reasignar la definición de campo, me quedo con
@@ -343,13 +353,22 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                             # datos de la tabla padre del campo final: cliente.tipo_cliente.usuario -> En este caso voy
                             # a hacer join a usuario, su tabla padre es tipo_cliente, la definición de campo que
                             # contiene el nombre de la tabla de tipos de cliente está en clientes.
-                            # FIXME Esto no está probado y seguramente no esté bien, fijarse cómo está hecho más abajo.
                             new_clause.parent_table = new_clause.parent_table if new_clause.parent_table is not None \
                                 else (self.__table if idx == 1 else join_parent_table_dict[field_name_array[-1]])
 
+                        # Si no tiene alias, el alias es la concatenación de todos los campos anidados hasta el íncidice
+                        # final no incluido, reemplazando los puntos por guiones. Lo hago así para evitar errores cuando
+                        # dos tablas tienen un campo que se llama igual y quiero traerme los dos. Si es una join clause,
+                        # que coja todos los elementos, lo de llegar hasta el penúltimo es para el resto porque las join
+                        # clauses son las distintas tablas como tal y el resto de cláusulas son campos de las mismas.
                         new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else \
-                            field_definition.referenced_table_name
-                        field_definition = field_definition.field_type.get_model_dict().get(val)  # noqa
+                            ''.join(field_name_array[0:] if is_join_clause else
+                                    field_name_array[0:-1]).replace('.', '-')
+                        # Lo compruebo por si acaso, pero no debería hacer falta, si llega hasta aquí el tipo debe ser
+                        # BaseEntity.
+                        if issubclass(field_definition.field_type, BaseEntity):
+                            entity_type = field_definition.field_type
+                            field_definition = entity_type.get_model_dict().get(val)  # noqa
 
                     # Añadir al mapa de los joins una clave-valor: clave es el nombre del campo, valor es la tabla
                     # relacionada.
@@ -359,39 +378,58 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                 # la tabla del DAO.
                 field_definition = self.entity_type.get_model_dict().get(f.table_name if is_join_clause
                                                                          else f.field_name)
-
                 # Si es una join clause:
                 if is_join_clause:
                     # La tabla padre será la del propio dao
                     new_clause.parent_table = new_clause.parent_table if new_clause.parent_table is not None \
                         else self.__table
-                    # La tabla será la tabla referenciada
-                    new_clause.table_name = field_definition.referenced_table_name
-                    # El alias será también el nombre de la tabla
-                    new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else \
-                        new_clause.table_name
                 else:
                     new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else self.__table
-
-            # Lanzar error si no existe uno de estos objetos
-            if field_definition is None or new_table_alias is None:
-                raise CustomException(translate("i18n_base_commonError_query_translate", None, str(new_clause)))
+                    # Si no es una join clause y sólo hay un campo tras el split, la entidad será la del dao
+                    entity_type = self.entity_type
 
             # Parte especial para cláusulas join
-            if is_join_clause:
+            if is_join_clause and field_definition is not None:
+                # La tabla será la tabla referenciada
+                new_clause.table_name = field_definition.referenced_table_name
+
+                # El alias será también el nombre de la tabla
+                new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else \
+                    new_clause.table_name
+
                 # Nombre del campo id de la clase
                 if new_clause.id_column_name is None:
-                    new_clause.id_column_name = field_definition.field_type.get_id_field_name() # noqa
+                    if issubclass(field_definition.field_type, BaseEntity):
+                        new_clause.id_column_name = field_definition.field_type.get_id_field_name()  # noqa
+                    else:
+                        # Esto no debería suceder.
+                        raise CustomException(translate("i18n_base_commonError_query_translate", None, str(new_clause)))
 
-                # Nombre del campo referenciado en la base de datos.
+                # Nombre del campo referenciado en la base de datos
                 if new_clause.parent_table_referenced_column_name is None:
                     new_clause.parent_table_referenced_column_name = field_definition.name_in_db
+
+            # Lanzar error si no existe uno de estos objetos
+            if field_definition is None or new_table_alias is None or (not is_join_clause and entity_type is None):
+                raise CustomException(translate("i18n_base_commonError_query_translate", None, str(new_clause)))
 
             # Sustituyo el nombre del campo por el equivalente en la base de datos
             new_clause.field_name = field_definition.name_in_db
             # Asignar el alias de la tabla resuelto anteriormente
             # Si es una join clause, si no hay alias debe utilizar lo que especifique la definición del campo
             new_clause.table_alias = new_table_alias
+
+            # Añado nueva clave al mapa de alias. La clave es el alias concatenado con el campo seleccionado
+            # (último elemento de la lista anterior). El valor será el tipo de entidad y el nombre del campo
+            # correspondiente en el modelo de Python. Le pongo delante el último índice, así tengo más fácil luego
+            # ordenar las claves e ir rellenando campos del modelo de Python en orden. Como tercer valor paso None
+            # si sólo es un campo, o todos los campos hasta el último no incluido si son más: lo necesitaré para
+            # convertir el diccionario resultante a objetos Python, para saber a qué campo corresponde en cada clase.
+            if not is_join_clause:
+                join_alias_table_name[f'{field_name_array_last_index}.{new_clause.table_alias}.'
+                                      f'{field_name_array[-1]}'] = (entity_type, new_clause.field_name,
+                                                                    ('.'.join(field_name_array[:-1]) if
+                                                                     field_name_array_last_index > 0 else None))
 
             # Lo añado a la lista
             clauses_translated.append(new_clause)
@@ -421,38 +459,86 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         group_by_translated = None
         # limit y offset no hace falta traducirlos, los paso tal cual
 
+        # Diccionario empleado para mantener una relación entre los distintos alias de las tablas que ha especificado
+        # el usuario al construir los objetos de modelado de la query, y el nombre que corresponde realmente al campo
+        # dentro del propio objeto en Python.
+        join_alias_table_name: Dict[str, Tuple[type, str, Union[str, None]]] = {}
+
         # La idea es que estas listas de cláusulas vienen con los campos de las entidades modeladas en python, se trata
         # de traducirlas al modelo de la base de datos.
 
         # Campos
         if fields and len(fields) > 0:
-            fields_translated = self.__resolve_translation_of_clauses(FieldClause, fields)
+            fields_translated = self.__resolve_translation_of_clauses(FieldClause, fields, join_alias_table_name)
 
         # Filtros
         if filters and len(filters) > 0:
-            filters_translated = self.__resolve_translation_of_clauses(FilterClause, filters)
+            filters_translated = self.__resolve_translation_of_clauses(FilterClause, filters, join_alias_table_name)
 
         # Order by
         if order_by and len(order_by) > 0:
-            order_by_translated = self.__resolve_translation_of_clauses(OrderByClause, order_by)
+            order_by_translated = self.__resolve_translation_of_clauses(OrderByClause, order_by, join_alias_table_name)
 
         # Group by
         if group_by and len(group_by) > 0:
-            group_by_translated = self.__resolve_translation_of_clauses(GroupByClause, group_by)
+            group_by_translated = self.__resolve_translation_of_clauses(GroupByClause, group_by, join_alias_table_name)
 
         # Joins
         if joins and len(joins) > 0:
-            joins_translated = self.__resolve_translation_of_clauses(JoinClause, joins, True)
+            joins_translated = self.__resolve_translation_of_clauses(JoinClause, joins, join_alias_table_name, True)
 
-        # RESULTADO
-        return self.__find_by_filtered_query_internal(fields=fields_translated, filters=filters_translated,
-                                                      order_by=order_by_translated, joins=joins_translated,
-                                                      group_by=group_by_translated, offset=offset, limit=limit)
+        # Ordeno el diccionario según la clave, así luego será más sencillo convertir el diccionario en entidades de
+        # acuerdo con un orden lógico. Esto sólo me devuelve una lista con las claves ordenadas, no un diccionario
+        # ordenado.
+        join_alias_table_name_list: list = sorted(join_alias_table_name)
+
+        # Vuelco el resultado en un diccionario ordenado, el primer token de la clave del diccionario que es un número
+        # empleado para saber la jerarquía de los campos calculada durante la traducción. En las claves del diccionario
+        # ordenado no lo quiero, sino no va a coincidir con lo que me ha devuelto la consulta.
+        join_alias_table_name_ordered: OrderedDict[str, Tuple[type, str, Union[str, None]]] = OrderedDict()
+        for v in join_alias_table_name_list:
+            join_alias_table_name_ordered['.'.join(v.split('.')[1:])] = join_alias_table_name[v]
+
+        # Estos dos objetos ya no los necesito, los elimino.
+        del join_alias_table_name_list, join_alias_table_name
+
+        # RESULTADO: Devuelve una lista de diccionarios
+        result_as_dict = self.__find_by_filtered_query_internal(fields=fields_translated, filters=filters_translated,
+                                                                order_by=order_by_translated, joins=joins_translated,
+                                                                group_by=group_by_translated, offset=offset,
+                                                                limit=limit)
+
+        # Elimino las listas de cláusulas traducidas, ya no las voy a necesitar
+        del fields_translated, filters_translated, order_by_translated, joins_translated, group_by_translated
+        # Libero memoria llamando explícitamente al recolector de basura
+        gc.collect()
+
+        # Recorrer lista de diccionarios e ir transformando cada valor en una entidad base
+        result: List[BaseEntity] = []
+        if result_as_dict:
+            for v in result_as_dict:
+                # Teniendo en cuenta la equivalencia de campos calculada en join_alias_table_name_ordered, crearé un
+                # nuevo diccionario mediante el cual se irán instanciando nuevas entidades para añadir al resultado.
+                for k, w in join_alias_table_name_ordered.items():
+                    if k in v:
+                        # Primero sustituyo la clave en el diccionario del resultado por el campo correspondiente en el
+                        # objeto. En la tupla almacenada, este valor es el tercero (índex 2). El primer valor es el tipo
+                        # de entidad base, y el segundo el nombre del campo como tal en dicha entidad.
+                        # FIXME No está bien
+                        old_value = v[k]
+                        v[w[2]] = v.pop(k)
+                        v[w[2]] = w[0]()
+                        setattr(v[w[2]], w[1], old_value)
+                        break
+
+                result.append(self.entity_type.convert_dict_to_entity(v))
+
+        return result
 
     def __find_by_filtered_query_internal(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
                                           order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
                                           group_by: List[GroupByClause] = None,
-                                          offset: int = None, limit: int = None) -> List[BaseEntity]:
+                                          offset: int = None, limit: int = None) -> List[dict]:
         """
         Ejecuta una consulta SELECT sobre la tabla principal del dao. Función interna con los campos ya traducidos al
         modelo de datos.
@@ -463,7 +549,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         :param group_by: Cláusulas GROUP BY.
         :param offset: Offset del límite de la consulta.
         :param limit: Límite de registros.
-        :return: Lista de entidades encontradas.
+        :return: Diccionario.
         """
         # Resuelto SELECT (por defecto, asterisco para todos los campos)
         select = '*'
@@ -526,16 +612,13 @@ class BaseDao(object, metaclass=abc.ABCMeta):
             limit_offset = resolve_limit_offset(limit=limit, offset=offset)
 
         # Ejecutar query
-        sql = f"SELECT {select.strip()} FROM {self.__table} {join.strip()} {filtro.strip()} {group.strip()} " \
-              f"{orden.strip()} {limit_offset.strip()}"
+        sql = f"SELECT {select.strip()} FROM {self.__table} {join.strip()} {filtro.strip()} " \
+              f"{group.strip()} {orden.strip()} {limit_offset.strip()}"
+
+        print(sql)
+
         # El resultado es una lista de  diccionarios, pero hay que transformarlo en modelo de datos
-        result_as_dict: dict = self.__execute_query_internal(sql=sql,
-                                                             sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)
+        result_as_dict: List[dict] = self.__execute_query_internal(sql=sql,
+                                                                   sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)
 
-        # Recorrer lista de diccionarios e ir transformando cada valor en una entidad base
-        result: List[BaseEntity] = []
-        if result_as_dict:
-            for v in result_as_dict:
-                result.append(self.entity_type.convert_dict_to_entity(v))
-
-        return result
+        return result_as_dict

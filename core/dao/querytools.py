@@ -3,6 +3,7 @@ from collections import namedtuple
 from typing import List
 
 from core.util.listutils import LoopIterationObject
+from core.util.stringutils import auto_str
 
 
 class EnumSQLOperationTypes(enum.Enum):
@@ -56,6 +57,7 @@ class EnumOperatorTypes(enum.Enum):
     OR = OperatorType(2, 'OR')
 
 
+@auto_str
 class FilterClause(object):
     """Clase para modelado de cláusulas WHERE para MySQL."""
 
@@ -160,6 +162,7 @@ class EnumOrderByTypes(enum.Enum):
     DESC = OrderByType(2, 'DESC')
 
 
+@auto_str
 class OrderByClause(object):
     """Clase para modelado de cláusulas ORDER BY para MySQL."""
 
@@ -209,6 +212,7 @@ class EnumJoinTypes(enum.Enum):
     RIGHT_JOIN = JoinType(3, 'RIGHT JOIN')
 
 
+@auto_str
 class JoinClause(object):
     """Clase para modelado de cláusulas JOIN para MySQL."""
 
@@ -246,6 +250,7 @@ def resolve_join_clause(iteration_object: LoopIterationObject, join_arr: List[st
 
 
 # GROUP BYs
+@auto_str
 class GroupByClause(object):
     """Clase para modelado de cláusulas GROUP BY para MySQL."""
 
@@ -275,6 +280,7 @@ def resolve_group_by_clause(iteration_object: LoopIterationObject, group_by_arr:
 
 
 # CAMPOS SELECT
+@auto_str
 class FieldClause(object):
     """Clase para modelado de campos SELECT para MySQL."""
 
