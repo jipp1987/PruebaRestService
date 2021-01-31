@@ -615,8 +615,6 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         sql = f"SELECT {select.strip()} FROM {self.__table} {join.strip()} {filtro.strip()} " \
               f"{group.strip()} {orden.strip()} {limit_offset.strip()}"
 
-        print(sql)
-
         # El resultado es una lista de  diccionarios, pero hay que transformarlo en modelo de datos
         result_as_dict: List[dict] = self.__execute_query_internal(sql=sql,
                                                                    sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)
