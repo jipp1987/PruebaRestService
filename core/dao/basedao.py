@@ -75,6 +75,9 @@ class BaseDao(object, metaclass=abc.ABCMeta):
     BaseService deben compartirlo, dado que los servicios asociados a los daos se llaman unos a otros. El identificador 
     es un entero con el ident del hilo actual, y el valor es un objeto de tipo BaseConnection."""
 
+    __field_alias_separator: str = "$$"
+    """Separador de los alias de los campos, para la traducción del resultado de la consulta al modelo de Python."""
+
     # Constructor
     def __init__(self, table: str, entity_type: type(BaseEntity)):
         self.__table = table
@@ -286,17 +289,18 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         self.__execute_query_internal(sql)
 
     def __resolve_translation_of_clauses(self, clause_type: type, clauses_list: list,
-                                         join_alias_table_name: Dict[str, Tuple[type, str, Union[str, None]]],
-                                         is_join_clause: bool = False):
+                                         join_alias_table_name: Dict[str, Tuple[type, str, Union[str, None]]]):
         """
         Resuelve la traducción de select, filtros, order_by y group_by.
         :param clause_type: Tipo de cláusula.
         :param clauses_list: Lista de cláusulas a traducir.
         :param join_alias_table_name: Diccionario empleado para mantener una relación entre los alias de las tablas y
         el nombre del campo en Python.
-        :param is_join_clause: Si es un join, utiliza otro campo por el que hacer el split. False por defecto.
         :return: Lista de filtros, order, group o fields traducidos a mysql.
         """
+        # Si es un join, utiliza otro campo por el que hacer el split.
+        is_join_clause = clause_type == JoinClause
+
         # Declaración de campos a asignar en bucle
         clauses_translated = []
         new_clause: clause_type
@@ -410,7 +414,8 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                     new_clause.parent_table_referenced_column_name = field_definition.name_in_db
 
             # Lanzar error si no existe uno de estos objetos
-            if field_definition is None or new_table_alias is None or (not is_join_clause and entity_type is None):
+            if field_definition is None or new_table_alias is None or (clause_type == FieldClause
+                                                                       and entity_type is None):
                 raise CustomException(translate("i18n_base_commonError_query_translate", None, str(new_clause)))
 
             # Sustituyo el nombre del campo por el equivalente en la base de datos
@@ -419,17 +424,23 @@ class BaseDao(object, metaclass=abc.ABCMeta):
             # Si es una join clause, si no hay alias debe utilizar lo que especifique la definición del campo
             new_clause.table_alias = new_table_alias
 
+            # Establecer alias de los campos seleccionados, lo necesito para transformar el resultado de la consulta
+            # en objetos Python. En este caso el alias lo establezco yo, ignorando lo que me pueda haber llegado.
+            if clause_type == FieldClause:
+                f_alias = '-'.join(new_clause.table_alias.split('.'))
+                f_alias = f'{f_alias}{type(self).__field_alias_separator}{field_name_array[-1]}'
+                new_clause.field_alias = f_alias
+
             # Añado nueva clave al mapa de alias. La clave es el alias concatenado con el campo seleccionado
             # (último elemento de la lista anterior). El valor será el tipo de entidad y el nombre del campo
             # correspondiente en el modelo de Python. Le pongo delante el último índice, así tengo más fácil luego
             # ordenar las claves e ir rellenando campos del modelo de Python en orden. Como tercer valor paso None
             # si sólo es un campo, o todos los campos hasta el último no incluido si son más: lo necesitaré para
             # convertir el diccionario resultante a objetos Python, para saber a qué campo corresponde en cada clase.
-            if not is_join_clause:
-                join_alias_table_name[f'{field_name_array_last_index}.{new_clause.table_alias}.'
-                                      f'{field_name_array[-1]}'] = (entity_type, new_clause.field_name,
-                                                                    ('.'.join(field_name_array[:-1]) if
-                                                                     field_name_array_last_index > 0 else None))
+            if clause_type == FieldClause:
+                join_alias_table_name[f'{field_name_array_last_index}.{new_clause.field_alias}'] = \
+                    (entity_type, new_clause.field_name, ('.'.join(field_name_array[:-1]) if
+                                                          field_name_array_last_index > 0 else None))
 
             # Lo añado a la lista
             clauses_translated.append(new_clause)
@@ -485,7 +496,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
         # Joins
         if joins and len(joins) > 0:
-            joins_translated = self.__resolve_translation_of_clauses(JoinClause, joins, join_alias_table_name, True)
+            joins_translated = self.__resolve_translation_of_clauses(JoinClause, joins, join_alias_table_name)
 
         # Ordeno el diccionario según la clave, así luego será más sencillo convertir el diccionario en entidades de
         # acuerdo con un orden lógico. Esto sólo me devuelve una lista con las claves ordenadas, no un diccionario

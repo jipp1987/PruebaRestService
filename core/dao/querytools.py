@@ -284,11 +284,13 @@ def resolve_group_by_clause(iteration_object: LoopIterationObject, group_by_arr:
 class FieldClause(object):
     """Clase para modelado de campos SELECT para MySQL."""
 
-    def __init__(self, field_name: str, table_alias: str):
+    def __init__(self, field_name: str, table_alias: str, field_alias: str = None):
         self.field_name = field_name
         """Nombre del campo SELECT."""
         self.table_alias = table_alias
         """Alias de la tabla."""
+        self.field_alias = field_alias
+        """Alias del campo."""
 
 
 def resolve_field_clause(iteration_object: LoopIterationObject, select_arr: List[str]):
@@ -305,7 +307,8 @@ def resolve_field_clause(iteration_object: LoopIterationObject, select_arr: List
         is_last: bool = iteration_object.is_last
 
         # Añadir campo a la SELECT, si no es el último añadir comas
-        select_arr.append(f"{item.table_alias}.{item.field_name} {('' if is_last else ', ')} ")
+        select_arr.append(f"{item.table_alias}.{item.field_name} "
+                          f"{item.field_alias if item.field_alias is not None else ''} {('' if is_last else ', ')} ")
 
 
 def resolve_limit_offset(limit: int, offset: int = None) -> str:
