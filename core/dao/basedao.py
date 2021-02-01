@@ -1,8 +1,6 @@
 import abc
 import copy
-import gc
 import threading
-from collections import OrderedDict
 from importlib.resources import Package
 from typing import Dict, Union, List, Tuple, Type
 
@@ -289,7 +287,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         self.__execute_query_internal(sql)
 
     def __resolve_translation_of_clauses(self, clause_type: type, clauses_list: list,
-                                         join_alias_table_name: Dict[str, Tuple[type, str, Union[str, None]]]):
+                                         join_alias_table_name: Dict[str, Tuple[str, Union[str, None]]]):
         """
         Resuelve la traducción de select, filtros, order_by y group_by.
         :param clause_type: Tipo de cláusula.
@@ -399,7 +397,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
                 # El alias será también el nombre de la tabla
                 new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else \
-                    new_clause.table_name
+                    field_name_array[-1]
 
                 # Nombre del campo id de la clase
                 if new_clause.id_column_name is None:
@@ -433,14 +431,14 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
             # Añado nueva clave al mapa de alias. La clave es el alias concatenado con el campo seleccionado
             # (último elemento de la lista anterior). El valor será el tipo de entidad y el nombre del campo
-            # correspondiente en el modelo de Python. Le pongo delante el último índice, así tengo más fácil luego
-            # ordenar las claves e ir rellenando campos del modelo de Python en orden. Como tercer valor paso None
-            # si sólo es un campo, o todos los campos hasta el último no incluido si son más: lo necesitaré para
-            # convertir el diccionario resultante a objetos Python, para saber a qué campo corresponde en cada clase.
+            # correspondiente en el modelo de Python. Como tercer valor paso None si sólo es un campo, o todos los
+            # campos hasta el último no incluido si son más: lo necesitaré para convertir el diccionario resultante a
+            # objetos Python, para saber a qué campo corresponde en cada clase. El cuarto valor es el último índice, que
+            # me indica el nivel de anidación de entidades partiendo de la base del dao.
             if clause_type == FieldClause:
-                join_alias_table_name[f'{field_name_array_last_index}.{new_clause.field_alias}'] = \
-                    (entity_type, new_clause.field_name, ('.'.join(field_name_array[:-1]) if
-                                                          field_name_array_last_index > 0 else None))
+                join_alias_table_name[new_clause.field_alias] = \
+                    (new_clause.field_name, ('.'.join(field_name_array[:-1]) if field_name_array_last_index > 0
+                                             else None))
 
             # Lo añado a la lista
             clauses_translated.append(new_clause)
@@ -473,7 +471,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # Diccionario empleado para mantener una relación entre los distintos alias de las tablas que ha especificado
         # el usuario al construir los objetos de modelado de la query, y el nombre que corresponde realmente al campo
         # dentro del propio objeto en Python.
-        join_alias_table_name: Dict[str, Tuple[type, str, Union[str, None]]] = {}
+        join_alias_table_name: Dict[str, Tuple[str, Union[str, None]]] = {}
 
         # La idea es que estas listas de cláusulas vienen con los campos de las entidades modeladas en python, se trata
         # de traducirlas al modelo de la base de datos.
@@ -498,51 +496,74 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         if joins and len(joins) > 0:
             joins_translated = self.__resolve_translation_of_clauses(JoinClause, joins, join_alias_table_name)
 
-        # Ordeno el diccionario según la clave, así luego será más sencillo convertir el diccionario en entidades de
-        # acuerdo con un orden lógico. Esto sólo me devuelve una lista con las claves ordenadas, no un diccionario
-        # ordenado.
-        join_alias_table_name_list: list = sorted(join_alias_table_name)
-
-        # Vuelco el resultado en un diccionario ordenado, el primer token de la clave del diccionario que es un número
-        # empleado para saber la jerarquía de los campos calculada durante la traducción. En las claves del diccionario
-        # ordenado no lo quiero, sino no va a coincidir con lo que me ha devuelto la consulta.
-        join_alias_table_name_ordered: OrderedDict[str, Tuple[type, str, Union[str, None]]] = OrderedDict()
-        for v in join_alias_table_name_list:
-            join_alias_table_name_ordered['.'.join(v.split('.')[1:])] = join_alias_table_name[v]
-
-        # Estos dos objetos ya no los necesito, los elimino.
-        del join_alias_table_name_list, join_alias_table_name
-
         # RESULTADO: Devuelve una lista de diccionarios
         result_as_dict = self.__find_by_filtered_query_internal(fields=fields_translated, filters=filters_translated,
                                                                 order_by=order_by_translated, joins=joins_translated,
                                                                 group_by=group_by_translated, offset=offset,
                                                                 limit=limit)
 
-        # Elimino las listas de cláusulas traducidas, ya no las voy a necesitar
-        del fields_translated, filters_translated, order_by_translated, joins_translated, group_by_translated
-        # Libero memoria llamando explícitamente al recolector de basura
-        gc.collect()
-
         # Recorrer lista de diccionarios e ir transformando cada valor en una entidad base
         result: List[BaseEntity] = []
-        if result_as_dict:
-            for v in result_as_dict:
-                # Teniendo en cuenta la equivalencia de campos calculada en join_alias_table_name_ordered, crearé un
-                # nuevo diccionario mediante el cual se irán instanciando nuevas entidades para añadir al resultado.
-                for k, w in join_alias_table_name_ordered.items():
-                    if k in v:
-                        # Primero sustituyo la clave en el diccionario del resultado por el campo correspondiente en el
-                        # objeto. En la tupla almacenada, este valor es el tercero (índex 2). El primer valor es el tipo
-                        # de entidad base, y el segundo el nombre del campo como tal en dicha entidad.
-                        # FIXME No está bien
-                        old_value = v[k]
-                        v[w[2]] = v.pop(k)
-                        v[w[2]] = w[0]()
-                        setattr(v[w[2]], w[1], old_value)
-                        break
+        if result_as_dict is not None and len(result_as_dict) > 0:
+            # Declaración de variables
+            field_value: any
+            field_name: str
+            nested_field: str
 
-                result.append(self.entity_type.convert_dict_to_entity(v))
+            # Estas dos variables las necesito para resolver el caso de entidades anidadas, para añadir dinámicamente
+            # diccionarios.
+            nested_field_array: list
+            last_dict: dict
+
+            # Cada resultado es un diccionario, como una fila del resultado de la consulta.
+            for row in result_as_dict:
+                # Buscar equivalencia de campos de consulta / definición de campos.
+                for k, v in join_alias_table_name.items():
+                    # Busco la coincidencia y modifico "al vuelo" el diccionario de la fila.
+                    field_value = row[k]
+                    field_name = v[0]
+                    nested_field = v[1]
+
+                    # Si esta variable es distinta de null, significa que es un campo de una entidad anidada.
+                    if nested_field is not None:
+                        # Divido el nombre del campo anidado por el separador del punto
+                        nested_field_array = nested_field.split(".")
+
+                        # Si el primer valor no está en el diccionario original, lo introduzco
+                        if nested_field_array[0] not in row:
+                            # Importante modificar el nombre de la clave original de la consulta por el primer valor
+                            # del array, que es el primer campo anidado partiendo de la entidad original del dao
+                            row[nested_field_array[0]] = row.pop(k)
+                            row[nested_field_array[0]] = {}
+
+                        # Modifico esta variable, que es la que va guardando la última referencia del diccionario a
+                        # actualizar
+                        last_dict = row[nested_field_array[0]]
+
+                        # Si tiene más de un elemento, significa que hay elementos anidados dentro del elemento
+                        # anidado
+                        if len(nested_field_array) > 1:
+                            for f in nested_field_array[1:]:
+                                # Si no existe el diccionario, lo añado
+                                if f not in last_dict:
+                                    last_dict[f] = {}
+
+                                # Actualizo la referencia al último diccionario
+                                last_dict = last_dict[f]
+
+                        # Finalmente introduzco el valor de la clave correspondiente
+                        last_dict[field_name] = field_value
+                        # Importante eliminar la clave original del diccionario de la fila, al haberla tratado y metido
+                        # en un diccionario anidado ya no es necesaria
+                        row.pop(k, None)
+                    else:
+                        # Sustituyo el alias de la tabla durante la consulta por el nombre de la clave en el
+                        # diccionario
+                        row[field_name] = row.pop(k)
+                        row[field_name] = field_value
+
+                # Usar la función de BaseEntity que convierte de diccionario a objeto
+                result.append(self.entity_type.convert_dict_to_entity(row))
 
         return result
 
