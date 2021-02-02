@@ -72,9 +72,18 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
 
     @classmethod
     @abc.abstractmethod
+    def get_id_field_name_in_db(cls) -> str:
+        """
+        Devuelve el nombre del campo id en la base de datos.
+        :return: str
+        """
+        pass
+
+    @classmethod
+    @abc.abstractmethod
     def get_id_field_name(cls) -> str:
         """
-        Devuelve el nombre del campo id.
+        Devuelve el nombre del campo id en el modelo de python.
         :return: str
         """
         pass
@@ -88,6 +97,19 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         :return: Dict[str, Tuple[any, FieldDefinition]
         """
         pass
+
+    @classmethod
+    def get_field_name_from_db_field(cls, db_field_name: str) -> str:
+        """Devuelve el nombre del campo en el modelo de python a partir del nombre en la base de datos."""
+        field_name: str = db_field_name
+        # Recorrer definiciones de campos, en cuanto encuentre la coincidencia del nombre en la base de datos, devuelvo
+        # la clave que de hecho es el nombre del campo en el modelo de python.
+        for k, v in cls.get_model_dict().items():
+            if v.name_in_db == db_field_name:
+                field_name = k
+                break
+
+        return field_name
 
     def to_json(self) -> Dict[str, any]:
         """Serializa la entidad a json."""
@@ -108,7 +130,7 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         Devuelve una cadena con los nombres de los campos separados por comas.
         :return: Una cadena de los campos de la entidad cuyo primer valor será el campo del id.
         """
-        cadena: str = type(self).get_id_field_name()
+        cadena: str = type(self).get_id_field_name_in_db()
 
         # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
         d = type(self).get_model_dict()
@@ -128,7 +150,7 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         :return: str
         """
         # Si 'is_id_included', incluyo el valor del campo id, sino pongo null. Útil pasarlo como False para inserts
-        cadena = getattr(self, type(self).get_id_field_name()) if is_id_included else "null"
+        cadena = getattr(self, type(self).get_id_field_name_in_db()) if is_id_included else "null"
 
         # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
         d = type(self).get_model_dict()
@@ -158,13 +180,12 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         Devuelve una cadena con los valores del objeto a modo de "atributo = valor" separados por ", "
         :return: str
         """
-        # Empiezo por el id
-        cadena = f'{type(self).get_id_field_name()} = {getattr(self, type(self).get_id_field_name())}'
-
-        # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
         d = type(self).get_model_dict()
 
-        # Completo con el resto
+        # Empiezo por el id (el nombre en el modelo de python y en la bd no tiene porqué coincidir)
+        cadena = f'{type(self).get_id_field_name_in_db()} = {getattr(self, type(self).get_id_field_name())}'
+
+        # Recorrer los nombres de los campos del objeto e ir concatenándolos separados por comas
         for key, value in d.items():
             # key es un string con el nombre del campo dentro del objeto.
             # Value es un objeto de tipo FieldDefinition
@@ -175,7 +196,7 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
                 # como valor
                 if issubclass(value.field_type, BaseEntity):
                     # Con esto obtengo el valor del id del campo referenciado
-                    v = getattr(v, type(v).get_id_field_name())
+                    v = getattr(v, value.field_type.get_id_field_name())
 
                 # Si es un str, encerrarlo entre comillas simples
                 if isinstance(v, str):

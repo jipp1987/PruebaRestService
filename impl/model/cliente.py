@@ -12,7 +12,7 @@ class Cliente(BaseEntity):
     # llamar a variables de la misma forma
     # Diccionario valores modelo
     __model_dict: Dict[str, FieldDefinition] = {
-        'id': FieldDefinition(field_type=int, name_in_db='id', is_primary_key=True, is_mandatory=True),
+        'cliente_id': FieldDefinition(field_type=int, name_in_db='id', is_primary_key=True, is_mandatory=True),
         'codigo': FieldDefinition(field_type=str, name_in_db='codigo', length_in_db=10, is_mandatory=True),
         'nombre': FieldDefinition(field_type=str, name_in_db='nombre', length_in_db=50, is_mandatory=True),
         'apellidos': FieldDefinition(field_type=str, name_in_db='apellidos', length_in_db=120),
@@ -24,10 +24,10 @@ class Cliente(BaseEntity):
     """Diccionario con los datos de los campos del modelo."""
 
     # Constructor
-    def __init__(self, id: int = None, codigo: str = None, nombre: str = None, apellidos: str = None,
+    def __init__(self, cliente_id: int = None, codigo: str = None, nombre: str = None, apellidos: str = None,
                  saldo: Decimal = None, tipo_cliente: TipoCliente = None):
         super().__init__()
-        self.id = id
+        self.cliente_id = cliente_id
         self.codigo = codigo
         self.nombre = nombre
         self.apellidos = apellidos
@@ -36,12 +36,12 @@ class Cliente(BaseEntity):
 
     # PROPIEDADES Y SETTERS
     @property
-    def id(self):
-        return self.__id
+    def cliente_id(self):
+        return self.__cliente_id
 
-    @id.setter
-    def id(self, id):
-        self.__id = id
+    @cliente_id.setter
+    def cliente_id(self, cliente_id):
+        self.__cliente_id = cliente_id
 
     @property
     def codigo(self):
@@ -94,8 +94,12 @@ class Cliente(BaseEntity):
         return cls.__model_dict
 
     @classmethod
+    def get_id_field_name_in_db(cls) -> str:
+        return cls.__model_dict.get('cliente_id').name_in_db
+
+    @classmethod
     def get_id_field_name(cls) -> str:
-        return cls.__model_dict.get('id').name_in_db
+        return 'cliente_id'
 
     # equals: uso el id para saber si es el mismo cliente
     def __eq__(self, other):
@@ -104,7 +108,7 @@ class Cliente(BaseEntity):
             # El id es el campo que me dice si es el mismo
             # Hay una función interna, __dict__, que serían todos los atributos modificables del objeto,
             # pero en este caso al ser un modelo de la base de datos me quedo con el id
-            return self.id == other.id
+            return self.cliente_id == other.cliente_id
         else:
             return False
 
@@ -120,11 +124,11 @@ class Cliente(BaseEntity):
     # conjunto como un diccionario, set... no puede cambiar su valor clave que se emplea en el hash
     def __hash__(self):
         # En este caso uso el mismo atributo que para el hash
-        return hash(self.id)
+        return hash(self.cliente_id)
 
     # función para representar como string el objeto
     def __repr__(self):
         # esto es una nueva forma en python3 de dar formato a un string, es mejor esto que concatenar cadenas,
         # sobretodo porque si le intentamos concatenar a una cadena un campo no string lanzará error durante
         # la ejecución
-        return f'id = {self.id}, codigo = {self.codigo}, (tipo de cliente = {str(self.tipo_cliente)})'
+        return f'cliente_id = {self.cliente_id}, codigo = {self.codigo}, (tipo de cliente = {str(self.tipo_cliente)})'
