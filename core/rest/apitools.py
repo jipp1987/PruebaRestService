@@ -142,7 +142,8 @@ def create_and_run_app(api_name: str, controllers: List[Tuple[any, str]], resour
         'host': get_data_from_resource("host"),
         'user': get_data_from_resource("username"),
         'password': get_data_from_resource("password"),
-        'database': get_data_from_resource("dbname")
+        'database': get_data_from_resource("dbname"),
+        'db_engine': get_data_from_resource("db_engine")
     }
 
     # Configurar conexión de base dao
