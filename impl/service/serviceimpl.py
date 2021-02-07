@@ -1,5 +1,5 @@
 from core.service.service import BaseService
-from impl.dao.daoimpl import TipoClienteDao, ClienteDao
+from impl.dao.daoimpl import TipoClienteDao, ClienteDao, UsuarioDao
 from impl.model.cliente import Cliente
 from impl.model.tipocliente import TipoCliente
 
@@ -20,3 +20,12 @@ class ClienteService(BaseService):
     def __init__(self):
         # de esta forma llamo al constructor del padre
         super().__init__(dao=ClienteDao())
+
+
+class UsuarioService(BaseService):
+    """Implementacion de service de usuarios. La herencia se realiza pasando como parámetro la clase padre."""
+
+    # Constructor
+    def __init__(self):
+        # de esta forma llamo al constructor del padre
+        super().__init__(dao=UsuarioDao())

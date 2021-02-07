@@ -71,13 +71,12 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         return entity
 
     @classmethod
-    @abc.abstractmethod
     def get_id_field_name_in_db(cls) -> str:
         """
         Devuelve el nombre del campo id en la base de datos.
         :return: str
         """
-        pass
+        return cls.get_model_dict().get(cls.get_id_field_name()).name_in_db
 
     @classmethod
     @abc.abstractmethod
@@ -89,14 +88,16 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         pass
 
     @classmethod
-    @abc.abstractmethod
     def get_model_dict(cls) -> Dict[str, FieldDefinition]:
         """
         Devuelve un diccionario siendo la clave un String con el nombre del campo del modelo en Python, y el valor
         un objeto FieldDefinition con la definición del campo teniendo en cuenta el modelo de la base de datos.
         :return: Dict[str, Tuple[any, FieldDefinition]
         """
-        pass
+        # Los diccionarios que contienen la definición se los campos son atributos privados de la clase, al menos
+        # por defecto, y su nombre es model_dict. Para acceder a este tipo de atributos usando getattr, el string debe
+        # tener este formato: _NombreDeLaClase__model_dict, sino no lo va a encontrar.
+        return getattr(cls, f"_{cls.__name__}__model_dict")
 
     @classmethod
     def get_field_name_from_db_field(cls, db_field_name: str) -> str:
@@ -170,6 +171,9 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
                 # Si es un str, encerrarlo entre comillas simples
                 if isinstance(v, str):
                     cadena += ", '" + str(v) + "'"
+                elif isinstance(v, bytes):
+                    # Si son bytes, decodificarlos como latin1
+                    cadena += ", '" + v.decode("latin1") + "'"
                 else:
                     cadena += ", " + str(v)
 
@@ -201,6 +205,9 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
                 # Si es un str, encerrarlo entre comillas simples
                 if isinstance(v, str):
                     cadena = f"{cadena} , {value.name_in_db} = '{v}'"
+                elif isinstance(v, bytes):
+                    # Si son bytes, decodificarlos como latin1
+                    cadena = f"{cadena} , {value.name_in_db} = '{v.decode('latin1')}'"
                 else:
                     cadena = f"{cadena} , {value.name_in_db} = {v}"
 

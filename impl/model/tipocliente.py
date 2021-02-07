@@ -48,14 +48,6 @@ class TipoCliente(BaseEntity):
 
     # FUNCIONES
     @classmethod
-    def get_model_dict(cls):
-        return cls.__model_dict
-
-    @classmethod
-    def get_id_field_name_in_db(cls) -> str:
-        return cls.__model_dict.get('tipo_cliente_id').name_in_db
-
-    @classmethod
     def get_id_field_name(cls) -> str:
         return 'tipo_cliente_id'
 

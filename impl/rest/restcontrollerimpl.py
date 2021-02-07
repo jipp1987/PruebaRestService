@@ -1,6 +1,6 @@
 from core.rest.restcontroller import RestController
 from core.service.service import ServiceFactory
-from impl.service.serviceimpl import TipoClienteService, ClienteService
+from impl.service.serviceimpl import TipoClienteService, ClienteService, UsuarioService
 
 
 class TipoClienteRestController(RestController):
@@ -15,3 +15,10 @@ class ClienteRestController(RestController):
 
     def get_main_service(self):
         return ServiceFactory.get_service(ClienteService)
+
+
+class UsuarioRestController(RestController):
+    """Rest controller para tipos de cliente."""
+
+    def get_main_service(self):
+        return ServiceFactory.get_service(UsuarioService)
