@@ -1,7 +1,7 @@
 from typing import Dict, Union
 
 from core.model.modeldefinition import FieldDefinition, BaseEntity
-from core.util.passwordutils import hash_password_using_bcrypt
+from core.util.passwordutils import hash_password_using_bcrypt, check_password_using_bcrypt
 
 
 class Usuario(BaseEntity):
@@ -16,7 +16,7 @@ class Usuario(BaseEntity):
     """Diccionario con los datos de los campos del modelo."""
 
     # Constructor
-    def __init__(self, usuario_id: int = None, username: str = None, password: str = None):
+    def __init__(self, usuario_id: int, username: str, password: str):
         super().__init__()
         self.usuario_id = usuario_id
         self.username = username
@@ -45,10 +45,16 @@ class Usuario(BaseEntity):
 
     @password.setter
     def password(self, password: Union[bytes, str]):
-        # TODO Esto no está bien: se supone que el password, una vez existe, debe ser fijo porque al ser un hash de
-        #  bcrypt lo va a modificar todo el rato aunque luego la equivalencia funcione bien.
-        # El password ha de ser tipo bytes, si llega un string significa que no está hasheado.
-        self.__password = password if isinstance(password, bytes) else hash_password_using_bcrypt(password)
+        # Si no hay password establecido, comprobar si hay que encriptarlo o no
+        if self.__password is None:
+            if isinstance(password, str):
+                self.__password = password if isinstance(password, bytes) else hash_password_using_bcrypt(password)
+        else:
+            # Si hay password ya establecido, comprobar is ha cambiado realmente (en caso de que sea un string)
+            if isinstance(password, str) and not check_password_using_bcrypt(password, self.__password):
+                self.__password = hash_password_using_bcrypt(password)
+            else:
+                self.__password = password
 
     # FUNCIONES
     @classmethod

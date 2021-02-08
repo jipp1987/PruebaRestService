@@ -15,7 +15,7 @@ class TipoCliente(BaseEntity):
     """Diccionario con los datos de los campos del modelo."""
 
     # Constructor
-    def __init__(self, tipo_cliente_id: int = None, codigo: str = None, descripcion: str = None):
+    def __init__(self, tipo_cliente_id: int, codigo: str, descripcion: str):
         super().__init__()
         self.tipo_cliente_id = tipo_cliente_id
         self.codigo = codigo

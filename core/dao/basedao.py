@@ -396,7 +396,10 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                                group_by: List[GroupByClause] = None,
                                offset: int = None, limit: int = None) -> List[BaseEntity]:
         """
-        Ejecuta una consulta SELECT sobre la tabla principal del dao.
+        Ejecuta una consulta SELECT sobre la tabla principal del dao. En importante tener en cuenta que aquellos campos
+        que no se hayan seleccionado llegarán invariablemente como null en los objetos resultantes, independientemente
+        de qué valor tengan en la base de datos; evidentemente, un campo que se haya seleccionado y llegue como null en
+        el objeto resultante significa que en la base de datos es null.
         :param fields: Campos seleccionados.
         :param filters: Filtros.
         :param order_by: Cláusulas ORDER BY.

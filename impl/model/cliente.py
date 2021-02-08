@@ -24,15 +24,15 @@ class Cliente(BaseEntity):
     """Diccionario con los datos de los campos del modelo."""
 
     # Constructor
-    def __init__(self, cliente_id: int = None, codigo: str = None, nombre: str = None, apellidos: str = None,
-                 saldo: Decimal = None, tipo_cliente: TipoCliente = None):
+    def __init__(self, cliente_id: int, codigo: str, nombre: str,
+                 saldo: Decimal, tipo_cliente: TipoCliente, apellidos: str = None):
         super().__init__()
         self.cliente_id = cliente_id
         self.codigo = codigo
         self.nombre = nombre
-        self.apellidos = apellidos
         self.saldo = saldo
         self.tipo_cliente = tipo_cliente
+        self.apellidos = apellidos
 
     # PROPIEDADES Y SETTERS
     @property

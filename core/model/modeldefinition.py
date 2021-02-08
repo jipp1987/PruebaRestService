@@ -34,27 +34,34 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
     """Entidad base de la que han de extender todos los objetos persistidos en la base de datos."""
 
     @classmethod
-    def convert_dict_to_entity(cls, d: dict):
+    def convert_dict_to_entity(cls, values_dict: dict):
         """
         Convierte un diccionario en una entidad base, siendo la clave el nombre de cada campo. Por defecto, lo que
         hace es descomponer el diccionario pasado como parámetro y usar los pares clave-valor obtenidos como argumentos
         del contructor de la entidad base. Es posible que haya que implementar esta función en caso de que la entidad
         tenga otras BaseEntity anidadas, en ese caso lo mejor es ir llamando a convert_dict_to_entity de esas entidades.
-        :param d: Diccionario con el atributo y valor de los campos de la entidad base.
+        :param values_dict: Diccionario con el atributo y valor de los campos de la entidad base.
         :return: Instancia de la entidad base con los atributos indicados en el diccionario.
         """
+        # Comprobar qué claves no están en el diccionario pasado como parámetro respecto al diccionario de la entidad
+        # para inicializar esos valores a None, y así evitar problemas al instanciar el objeto.
+        entity_dict: dict = cls.get_model_dict()
+        for key in entity_dict.keys():
+            if key not in values_dict:
+                values_dict[key] = None
+
         # En este caso, de forma genérica, lo que hago es descomponer el diccionario en pares clave-valor con el
         # operador **. Lo que va a hacer es ir al constructor del objeto y sustituir los argumentos de éste por los
         # pares obtenidos.
         # La siguiente línea es para ignorar un warning de parámetro inesperado que no me interesa.
         # noinspection PyArgumentList
-        entity = cls(**d)
+        entity = cls(**values_dict)
 
         # Voy a iterar sobre los valores del objeto en función del diccionario de valores del modelo
         # Lo hago porque al transformar un diccionario en un modelo, si tiene otro modelo anidado éste sigue siendo
         # un diccionario tras la transformación, con lo cual lo que hay que hacer es llamar de forma recursiva a esta
         # función para tranformar todos los modelos anidados en objetos BaseEntity
-        for key, value in type(entity).get_model_dict().items():
+        for key, value in entity_dict.items():
             # El valor de la clave es un objeto FieldDefinition.
             entity_type = value.field_type
 
