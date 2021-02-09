@@ -119,10 +119,10 @@ class BaseService(object):
         """
         self._dao.delete_entity(entity)
 
-    def find_by_filtered_query(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
-                               order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
-                               group_by: List[GroupByClause] = None,
-                               offset: int = None, limit: int = None) -> List[BaseEntity]:
+    def select(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
+               order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
+               group_by: List[GroupByClause] = None,
+               offset: int = None, limit: int = None) -> list:
         """
         Ejecuta una consulta SELECT sobre la tabla principal del dao. En importante tener en cuenta que aquellos campos
         que no se hayan seleccionado llegarán invariablemente como null en los objetos resultantes, independientemente
@@ -137,8 +137,8 @@ class BaseService(object):
         :param limit: Límite de registros.
         :return: Lista de entidades encontradas.
         """
-        return self._dao.find_by_filtered_query(filters=filters, order_by=order_by, fields=fields, group_by=group_by,
-                                                joins=joins, offset=offset, limit=limit)
+        return self._dao.select(filters=filters, order_by=order_by, fields=fields, group_by=group_by,
+                                joins=joins, offset=offset, limit=limit)
 
 
 class ServiceFactory(object):

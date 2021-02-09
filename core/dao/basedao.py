@@ -20,7 +20,6 @@ from core.util.i18nutils import translate
 from core.model.modeldefinition import BaseEntity
 from core.util.listutils import optimized_for_loop
 
-
 _SQLEngineTypes = namedtuple('SQLEngineTypes', ['value', 'engine_name'])
 """Tupla para propiedades de EnumSQLEngineTypes. La uso para poder añadirle una propiedad al enumerado, aparte del 
 propio valor."""
@@ -391,10 +390,10 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
         return result
 
-    def find_by_filtered_query(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
-                               order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
-                               group_by: List[GroupByClause] = None,
-                               offset: int = None, limit: int = None) -> List[BaseEntity]:
+    def select(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
+               order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
+               group_by: List[GroupByClause] = None,
+               offset: int = None, limit: int = None) -> List[BaseEntity]:
         """
         Ejecuta una consulta SELECT sobre la tabla principal del dao. En importante tener en cuenta que aquellos campos
         que no se hayan seleccionado llegarán invariablemente como null en los objetos resultantes, independientemente
@@ -451,10 +450,10 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                                                               self.__table, join_alias_table_name)
 
         # RESULTADO: Devuelve una lista de diccionarios
-        result_as_dict = self.__find_by_filtered_query_internal(fields=fields_translated, filters=filters_translated,
-                                                                order_by=order_by_translated, joins=joins_translated,
-                                                                group_by=group_by_translated, offset=offset,
-                                                                limit=limit)
+        result_as_dict = self.__select_internal(fields=fields_translated, filters=filters_translated,
+                                                order_by=order_by_translated, joins=joins_translated,
+                                                group_by=group_by_translated, offset=offset,
+                                                limit=limit)
 
         result: List[BaseEntity]
         if result_as_dict is not None and len(result_as_dict) > 0:
@@ -466,10 +465,10 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
         return result
 
-    def __find_by_filtered_query_internal(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
-                                          order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
-                                          group_by: List[GroupByClause] = None,
-                                          offset: int = None, limit: int = None) -> List[dict]:
+    def __select_internal(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
+                          order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
+                          group_by: List[GroupByClause] = None,
+                          offset: int = None, limit: int = None) -> List[dict]:
         """
         Ejecuta una consulta SELECT sobre la tabla principal del dao. Función interna con los campos ya traducidos al
         modelo de datos.

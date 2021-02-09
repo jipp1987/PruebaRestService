@@ -60,8 +60,8 @@ class EnumOperatorTypes(enum.Enum):
 class FilterClause(object):
     """Clase para modelado de cláusulas WHERE para MySQL."""
 
-    def __init__(self, field_name: str, filter_type: (EnumFilterTypes, str), object_to_compare: any, table_alias: str,
-                 operator_type: (EnumOperatorTypes, str) = None, start_parenthesis: int = None,
+    def __init__(self, field_name: str, filter_type: (EnumFilterTypes, str), object_to_compare: any,
+                 table_alias: str = None, operator_type: (EnumOperatorTypes, str) = None, start_parenthesis: int = None,
                  end_parenthesis: int = None):
         self.field_name = field_name
         """Nombre del campo."""
@@ -102,7 +102,7 @@ class EnumOrderByTypes(enum.Enum):
 class OrderByClause(object):
     """Clase para modelado de cláusulas ORDER BY para MySQL."""
 
-    def __init__(self, field_name: str, order_by_type: (EnumOrderByTypes, str), table_alias: str):
+    def __init__(self, field_name: str, order_by_type: (EnumOrderByTypes, str), table_alias: str = None):
         self.field_name = field_name
         """Nombre del campo."""
         self.order_by_type = order_by_type if isinstance(order_by_type, EnumOrderByTypes) \
@@ -155,7 +155,7 @@ class JoinClause(object):
 class GroupByClause(object):
     """Clase para modelado de cláusulas GROUP BY para MySQL."""
 
-    def __init__(self, field_name: str, table_alias: str):
+    def __init__(self, field_name: str, table_alias: str = None):
         self.field_name = field_name
         """Nombre del campo sobre el que se va a aplicar la cláusula group by."""
         self.table_alias = table_alias
@@ -167,7 +167,7 @@ class GroupByClause(object):
 class FieldClause(object):
     """Clase para modelado de campos SELECT para MySQL."""
 
-    def __init__(self, field_name: str, table_alias: str, field_alias: str = None):
+    def __init__(self, field_name: str, table_alias: str = None, field_alias: str = None):
         self.field_name = field_name
         """Nombre del campo SELECT."""
         self.table_alias = table_alias

@@ -1,7 +1,6 @@
-from typing import Dict, Union
+from typing import Dict
 
 from core.model.modeldefinition import FieldDefinition, BaseEntity
-from core.util.passwordutils import hash_password_using_bcrypt, check_password_using_bcrypt
 
 
 class Usuario(BaseEntity):
@@ -11,7 +10,7 @@ class Usuario(BaseEntity):
     __model_dict: Dict[str, FieldDefinition] = {
         'usuario_id': FieldDefinition(field_type=int, name_in_db='id', is_primary_key=True, is_mandatory=True),
         'username': FieldDefinition(field_type=str, name_in_db='username', length_in_db=80, is_mandatory=True),
-        'password': FieldDefinition(field_type=bytes, name_in_db='password', length_in_db=60, is_mandatory=True)
+        'password': FieldDefinition(field_type=str, name_in_db='password', length_in_db=60, is_mandatory=True)
     }
     """Diccionario con los datos de los campos del modelo."""
 
@@ -44,17 +43,8 @@ class Usuario(BaseEntity):
         return self.__password
 
     @password.setter
-    def password(self, password: Union[bytes, str]):
-        # Si no hay password establecido, comprobar si hay que encriptarlo o no
-        if self.__password is None:
-            if isinstance(password, str):
-                self.__password = password if isinstance(password, bytes) else hash_password_using_bcrypt(password)
-        else:
-            # Si hay password ya establecido, comprobar is ha cambiado realmente (en caso de que sea un string)
-            if isinstance(password, str) and not check_password_using_bcrypt(password, self.__password):
-                self.__password = hash_password_using_bcrypt(password)
-            else:
-                self.__password = password
+    def password(self, password):
+        self.__password = password
 
     # FUNCIONES
     @classmethod

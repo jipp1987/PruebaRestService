@@ -87,13 +87,13 @@ class RestController(flask_restful.Resource):
     def _select_with_response(self, query_object: JsonQuery):
         """Método para seleccionar datos de una tabla."""
         # Hago la consulta
-        result: List[BaseEntity] = self.get_main_service().find_by_filtered_query(filters=query_object.filters,
-                                                                                  order_by=query_object.order,
-                                                                                  fields=query_object.fields,
-                                                                                  group_by=query_object.group_by,
-                                                                                  joins=query_object.joins,
-                                                                                  offset=query_object.offset,
-                                                                                  limit=query_object.limit)
+        result: List[BaseEntity] = self.get_main_service().select(filters=query_object.filters,
+                                                                  order_by=query_object.order,
+                                                                  fields=query_object.fields,
+                                                                  group_by=query_object.group_by,
+                                                                  joins=query_object.joins,
+                                                                  offset=query_object.offset,
+                                                                  limit=query_object.limit)
         return result
 
     @staticmethod
