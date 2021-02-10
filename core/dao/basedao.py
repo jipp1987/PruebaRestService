@@ -399,7 +399,10 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         que no se hayan seleccionado llegarán invariablemente como null en los objetos resultantes, independientemente
         de qué valor tengan en la base de datos; evidentemente, un campo que se haya seleccionado y llegue como null en
         el objeto resultante significa que en la base de datos es null.
-        :param fields: Campos seleccionados.
+        :param fields: Campos seleccionados. Para seleccionar todos los campos de una de las entidades, pasar asterisco.
+        No se traerán los campos de entidades anidadas: para ello, habrá que poner otro FieldClause con el
+        nombre del campo a traer (partiendo de la entidad base) seguido de asterisco: 'entidad_anidada_1.*',
+        'entidad_anidada_1.entidad_anidada_1_1.*...'.
         :param filters: Filtros.
         :param order_by: Cláusulas ORDER BY.
         :param joins: Cláusulas JOIN.
@@ -409,7 +412,6 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         :return: Lista de entidades encontradas.
         """
         # declaro una serie de campos para pasar a la función interna, asumiendo primero que son null.
-        fields_translated = None
         filters_translated = None
         order_by_translated = None
         joins_translated = None
@@ -424,10 +426,13 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # La idea es que estas listas de cláusulas vienen con los campos de las entidades modeladas en python, se trata
         # de traducirlas al modelo de la base de datos.
 
-        # Campos
-        if fields and len(fields) > 0:
-            fields_translated = resolve_translation_of_clauses(FieldClause, fields, self.entity_type, self.__table,
-                                                               join_alias_table_name)
+        # Campos. Debe hacer algo para seleccionar, si no es el caso se seleccionan todos los campos de
+        # la entidad principal.
+        if not fields or len(fields) <= 0:
+            fields = [FieldClause(field_name='*')]
+
+        fields_translated = resolve_translation_of_clauses(FieldClause, fields, self.entity_type, self.__table,
+                                                           join_alias_table_name)
 
         # Filtros
         if filters and len(filters) > 0:
@@ -482,7 +487,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         :return: Diccionario.
         """
         # Resuelto SELECT (por defecto, asterisco para todos los campos)
-        select = '*'
+        select = ''
         if fields:
             # Creo un array de strings y luego lo concateno con join. Es la forma más eficiente para generar el filtro
             # desde las listas.

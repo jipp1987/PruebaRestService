@@ -1,4 +1,5 @@
 import copy
+from collections import OrderedDict
 from typing import List, Union, Type, Dict, Tuple
 
 from core.dao.querytools import EnumFilterTypes, FilterClause, OrderByClause, JoinClause, GroupByClause, FieldClause
@@ -160,6 +161,41 @@ def resolve_limit_offset(limit: int, offset: int = None) -> str:
     return limit_offset
 
 
+def __complete_field_clause(field_clause: FieldClause, base_entity_type: Type[BaseEntity]) -> List[FieldClause]:
+    """
+    Para aquellas fieldclause con asterisco, se ha de sustituir ese campo por la selección de todos los de la entidad.
+    :param field_clause:
+    :param base_entity_type:
+    :return: List[FieldClause]
+    """
+    # Separar el campo por el punto: la entidad que hay que traer será la del último nivel de anidación partiendo de la
+    # entidad base.
+    field_name_array = field_clause.field_name.split(".")
+    # Al final devuelvo una nueva lista de field clause
+    new_field_list: List[FieldClause] = []
+
+    last_entity: Type[BaseEntity] = base_entity_type
+    field_name_array_last_index = len(field_name_array) - 1
+
+    for idx, val in enumerate(field_name_array):
+        # Si es el último index, ése es el campo que quiero traer.
+        if idx == field_name_array_last_index:
+            for k, v in last_entity.get_model_dict().items():
+                # Sólo considero campos que no sean entidades anidadas; ésas se han de resolver en su propio FieldClause
+                # con asterisco.
+                if v.referenced_table_name is None:
+                    # Añado un nuevo FieldClause, de tal manera que el campo sea la concatenación de los campos
+                    # anteriores con puntos más la clave en sustitución del asterisco
+                    new_field_list.append(FieldClause(field_name=field_clause.field_name.replace('*', k),
+                                          table_alias=field_clause.table_alias))
+        else:
+            # Si no es el último índice significa que es un campo anidado dentro de la entidad principal. Lo voy
+            # almacenando.
+            last_entity = last_entity.get_model_dict()[val].field_type # noqa
+
+    return new_field_list
+
+
 def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_entity_type: Type[BaseEntity],
                                    table_db_name: str,
                                    join_alias_table_name: Dict[str, Tuple[str, Union[str, None],
@@ -190,9 +226,28 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
     """Esto lo uso para los joins, para poder mantenerlos relacionados. La clave es el nombre del campo y el valor 
     es el nombre real de la tabla en la base de datos."""
 
+    # Si es un fieldclause y el campo termina en asterisco, significa que se quieren seleccionar todos los campos.
+    if clause_type == FieldClause:
+        # Guardo para cada posición la lista obtenida, para así luego sustituir por posición
+        replace_field_clause_map: OrderedDict[FieldClause, list] = OrderedDict()
+
+        for f in clauses_list:
+            if f.field_name.endswith('*'):
+                replace_field_clause_map[f] = __complete_field_clause(f, base_entity_type)
+
+        # Elimino las cláusulas con asterisco de las posiciones
+        if len(replace_field_clause_map) > 0:
+            for k in replace_field_clause_map.keys():
+                clauses_list.remove(k)
+
+            # Inserto las listas.
+            for v in replace_field_clause_map.values():
+                clauses_list.extend(v)
+
     for f in clauses_list:
         # Copio el objeto entrante
         new_clause = copy.deepcopy(f)
+
         field_definition = None
         new_table_alias = None
         entity_type = None

@@ -4,6 +4,17 @@ import json
 from json import JSONEncoder
 
 
+class FakeFloat(float):
+    """Clase de float falsos para convertir a json Decimals."""
+
+    def __init__(self, value):
+        super().__init__()
+        self._value = value
+
+    def __repr__(self):
+        return str(self._value)
+
+
 class CustomJsonEncoder(JSONEncoder):
     """Codificador JSON de entidades."""
 
