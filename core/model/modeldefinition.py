@@ -136,6 +136,7 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
             # Caso especial para cuando es número decimal: uso una clase auxiliar que simula un float, que json
             # puede codificar. Decimal no tiene json y si se envía sin más en el resultado, lanza un error de referencia
             # circular al enviar la respuesta.
+            # TODO Esto es un poco chapucero, lo mejor sería que de todo este rollo se encargase jsonutils.
             if isinstance(v, Decimal):
                 json_dict[key] = FakeFloat(v)
             else:
