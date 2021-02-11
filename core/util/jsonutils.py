@@ -1,18 +1,9 @@
 """Utilidades json."""
+import datetime
 import inspect
 import json
+from decimal import Decimal, ROUND_HALF_UP
 from json import JSONEncoder
-
-
-class FakeFloat(float):
-    """Clase de float falsos para convertir a json Decimals."""
-
-    def __init__(self, value):
-        super().__init__()
-        self._value = value
-
-    def __repr__(self):
-        return str(self._value)
 
 
 class CustomJsonEncoder(JSONEncoder):
@@ -39,7 +30,23 @@ class CustomJsonEncoder(JSONEncoder):
                 and not inspect.isroutine(value)
             )
             return self.default(d)
+
         return obj
+
+
+def resolve_object_serialize(obj: any):
+    """Resuelve para ciertos tipos de datos el formato json."""
+    if isinstance(obj, Decimal):
+        # En caso de Decimal, devolver un float redondeado hacia arriba desde cinco incluido y reescalando.
+        return float(Decimal(obj).quantize(Decimal("0.01"), ROUND_HALF_UP))
+        # Caso de datetime
+    elif isinstance(obj, (datetime.datetime, datetime.date, datetime.time)):
+        return obj.isoformat()
+    elif isinstance(obj, datetime.timedelta):
+        return (datetime.datetime.min + obj).time().isoformat()
+
+    # En cualquier otro caso, devolver el objeto tal cual
+    return obj
 
 
 def encode_object_to_json(object_to_encode: any) -> str:

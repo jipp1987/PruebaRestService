@@ -1,9 +1,8 @@
 import abc
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Dict, Tuple
 
-from core.util.jsonutils import FakeFloat
+from core.util.jsonutils import resolve_object_serialize
 
 
 @dataclass(repr=True, init=False)
@@ -132,14 +131,6 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
         for key, value in d.items():
             # Codifico cada valor a json (compruebo si ya tiene una función to_json)
             v = getattr(self, key)
-
-            # Caso especial para cuando es número decimal: uso una clase auxiliar que simula un float, que json
-            # puede codificar. Decimal no tiene json y si se envía sin más en el resultado, lanza un error de referencia
-            # circular al enviar la respuesta.
-            # TODO Esto es un poco chapucero, lo mejor sería que de todo este rollo se encargase jsonutils.
-            if isinstance(v, Decimal):
-                json_dict[key] = FakeFloat(v)
-            else:
-                json_dict[key] = v.to_json() if hasattr(v, "to_json") else v
+            json_dict[key] = v.to_json() if hasattr(v, "to_json") else resolve_object_serialize(v)
 
         return json_dict
