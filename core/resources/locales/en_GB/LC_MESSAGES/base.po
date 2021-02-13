@@ -13,6 +13,9 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 # Mensajes
+msgid "i18n_base_commonError_not_id_in_update"
+msgstr "An id has not been sent to identify the entity to update."
+
 msgid "i18n_base_common_insert_success"
 msgstr "The record '%s' has been inserted successfully."
 

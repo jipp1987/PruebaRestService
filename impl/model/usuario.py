@@ -18,8 +18,11 @@ class Usuario(BaseEntity):
     def __init__(self, usuario_id: int, username: str, password: str):
         super().__init__()
         self.usuario_id = usuario_id
+        """Id del usuario."""
         self.username = username
+        """Nombre único del usuario."""
         self.password = password
+        """Password."""
 
     # PROPIEDADES Y SETTERS
     @property

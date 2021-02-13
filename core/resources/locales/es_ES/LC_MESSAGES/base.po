@@ -23,6 +23,9 @@ msgid "i18n_base_common_update_success"
 msgstr "El registro '%s' se ha actualizado con éxito."
 
 # Errores
+msgid "i18n_base_commonError_not_id_in_update"
+msgstr "No se han enviado un id para identificar la entidad a actualizar."
+
 msgid "i18n_base_knownError_integrityError"
 msgstr "Se ha producido un error al introducir o modificar el registro, es posible que exista uno igual."
 

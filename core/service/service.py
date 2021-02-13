@@ -3,7 +3,7 @@ import types
 from typing import Type, Dict, Callable, List
 
 from core.dao.basedao import BaseDao
-from core.dao.querytools import FieldClause, FilterClause, JoinClause, OrderByClause, GroupByClause
+from core.dao.querytools import FieldClause, FilterClause, JoinClause, OrderByClause, GroupByClause, EnumFilterTypes
 from core.exception.exceptionhandler import BugBarrier
 from core.model.modeldefinition import BaseEntity
 from core.util.noconflict import makecls
@@ -139,6 +139,21 @@ class BaseService(object):
         """
         return self._dao.select(filters=filters, order_by=order_by, fields=fields, group_by=group_by,
                                 joins=joins, offset=offset, limit=limit)
+
+    def select_by_id(self, id_value: any):
+        """
+        Devuelve un único registro de acuerdo al id pasado como parámetro. Devuelve None si no lo encuentra.
+        :param id_value:
+        :return: Entity.
+        """
+        # Uso la select normal pasando como único filtro el id.
+        filters: List[FilterClause] = [FilterClause(self.get_entity_type().get_id_field_name(), EnumFilterTypes.EQUALS,
+                                                    id_value)]
+        result = self.select(filters=filters, offset=0, limit=1)
+        if result and len(result) > 0:
+            return result[0]
+        else:
+            return None
 
 
 class ServiceFactory(object):

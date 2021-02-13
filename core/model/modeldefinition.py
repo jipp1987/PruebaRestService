@@ -1,6 +1,6 @@
 import abc
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 
 from core.util.jsonutils import resolve_object_serialize
 
@@ -36,21 +36,25 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
     """Entidad base de la que han de extender todos los objetos persistidos en la base de datos."""
 
     @classmethod
-    def convert_dict_to_entity(cls, values_dict: dict):
+    def convert_dict_to_entity(cls, values_dict: dict, return_non_existent_values: bool = False):
         """
         Convierte un diccionario en una entidad base, siendo la clave el nombre de cada campo. Por defecto, lo que
         hace es descomponer el diccionario pasado como parámetro y usar los pares clave-valor obtenidos como argumentos
         del contructor de la entidad base. Es posible que haya que implementar esta función en caso de que la entidad
         tenga otras BaseEntity anidadas, en ese caso lo mejor es ir llamando a convert_dict_to_entity de esas entidades.
         :param values_dict: Diccionario con el atributo y valor de los campos de la entidad base.
+        :param return_non_existent_values: Si true, devolverá un listado con los valores de campos que no se han pasado
+        en values_dict, de tal manera que se podría considerar un registro de campos no definidos.
         :return: Instancia de la entidad base con los atributos indicados en el diccionario.
         """
         # Comprobar qué claves no están en el diccionario pasado como parámetro respecto al diccionario de la entidad
         # para inicializar esos valores a None, y así evitar problemas al instanciar el objeto.
         entity_dict: dict = cls.get_model_dict()
+        non_existent_values: List[str] = []
         for key in entity_dict.keys():
             if key not in values_dict:
                 values_dict[key] = None
+                non_existent_values.append(key)
 
         # En este caso, de forma genérica, lo que hago es descomponer el diccionario en pares clave-valor con el
         # operador **. Lo que va a hacer es ir al constructor del objeto y sustituir los argumentos de éste por los
@@ -77,7 +81,10 @@ class BaseEntity(object, metaclass=abc.ABCMeta):
                     # el diccionario
                     setattr(entity, key, entity_type.convert_dict_to_entity(other_entity))
 
-        return entity
+        if return_non_existent_values:
+            return entity, non_existent_values
+        else:
+            return entity
 
     @classmethod
     def get_id_field_name_in_db(cls) -> str:

@@ -3,6 +3,7 @@ from typing import Dict
 
 from core.model.modeldefinition import BaseEntity, FieldDefinition
 from impl.model.tipocliente import TipoCliente
+from impl.model.usuario import Usuario
 
 
 class Cliente(BaseEntity):
@@ -20,19 +21,34 @@ class Cliente(BaseEntity):
                                  default_value=Decimal(str('0'))),
         'tipo_cliente': FieldDefinition(field_type=TipoCliente, name_in_db='tipoclienteid', is_mandatory=True,
                                         referenced_table_name='tiposcliente'),
+        'usuario_creacion': FieldDefinition(field_type=Usuario, name_in_db='usuariocreacionid', is_mandatory=False,
+                                            referenced_table_name='usuarios'),
+        'usuario_ult_mod': FieldDefinition(field_type=Usuario, name_in_db='usuarioultmodid', is_mandatory=False,
+                                           referenced_table_name='usuarios')
     }
     """Diccionario con los datos de los campos del modelo."""
 
     # Constructor
     def __init__(self, cliente_id: int, codigo: str, nombre: str,
-                 saldo: Decimal, tipo_cliente: TipoCliente, apellidos: str = None):
+                 saldo: Decimal, tipo_cliente: TipoCliente, apellidos: str = None, usuario_creacion: Usuario = None,
+                 usuario_ult_mod: Usuario = None):
         super().__init__()
         self.cliente_id = cliente_id
+        """Id del cliente."""
         self.codigo = codigo
+        """Código único."""
         self.nombre = nombre
+        """Nombre del cliente."""
         self.saldo = saldo
+        """Saldo del cliente."""
         self.tipo_cliente = tipo_cliente
+        """Tipo de cliente."""
         self.apellidos = apellidos
+        """Apellidos."""
+        self.usuario_creacion = usuario_creacion
+        """Usuario de creación."""
+        self.usuario_ult_mod = usuario_ult_mod
+        """Usuario de última modificación."""
 
     # PROPIEDADES Y SETTERS
     @property
@@ -87,6 +103,22 @@ class Cliente(BaseEntity):
     @tipo_cliente.setter
     def tipo_cliente(self, tipo_cliente):
         self.__tipo_cliente = tipo_cliente
+
+    @property
+    def usuario_creacion(self):
+        return self.usuario_creacion
+
+    @usuario_creacion.setter
+    def usuario_creacion(self, usuario_creacion):
+        self.__usuario_creacion = usuario_creacion
+
+    @property
+    def usuario_ult_mod(self):
+        return self.usuario_ult_mod
+
+    @usuario_ult_mod.setter
+    def usuario_ult_mod(self, usuario_ult_mod):
+        self.__usuario_ult_mod = usuario_ult_mod
 
     # FUNCIONES
     @classmethod
