@@ -61,7 +61,7 @@ class TipoCliente(BaseEntity):
 
     @property
     def usuario_creacion(self):
-        return self.usuario_creacion
+        return self.__usuario_creacion
 
     @usuario_creacion.setter
     def usuario_creacion(self, usuario_creacion):
@@ -69,7 +69,7 @@ class TipoCliente(BaseEntity):
 
     @property
     def usuario_ult_mod(self):
-        return self.usuario_ult_mod
+        return self.__usuario_ult_mod
 
     @usuario_ult_mod.setter
     def usuario_ult_mod(self, usuario_ult_mod):
