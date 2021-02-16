@@ -105,7 +105,7 @@ def resolve_join_clause(iteration_object: LoopIterationObject, join_arr: List[st
         # Desde el objeto de iteración obtengo los valores para operar en la función
         item: JoinClause = iteration_object.item
         # Crear join
-        join_arr.append(f"{item.join_type.join_keyword} {item.table_name} {item.table_alias} "
+        join_arr.append(f" {item.join_type.join_keyword} {item.table_name} {item.table_alias} "
                         f"ON {item.table_alias}.{item.id_column_name} = "
                         f"{item.parent_table}.{item.parent_table_referenced_column_name}")
 

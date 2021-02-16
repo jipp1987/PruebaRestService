@@ -134,8 +134,8 @@ class EnumJoinTypes(enum.Enum):
 class JoinClause(object):
     """Clase para modelado de cláusulas JOIN para MySQL."""
 
-    def __init__(self, table_name: str, join_type: (EnumJoinTypes, str), parent_table: str,
-                 parent_table_referenced_column_name: str, table_alias: str = None, id_column_name: str = "id"):
+    def __init__(self, table_name: str, join_type: (EnumJoinTypes, str), parent_table: str = None,
+                 parent_table_referenced_column_name: str = None, table_alias: str = None, id_column_name: str = "id"):
         self.table_name = table_name
         """Nombre de la tabla hacia la que se va a hacer join."""
         self.join_type = join_type if isinstance(join_type, EnumJoinTypes) else EnumJoinTypes[join_type]

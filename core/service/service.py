@@ -3,7 +3,8 @@ import types
 from typing import Type, Dict, Callable, List
 
 from core.dao.basedao import BaseDao
-from core.dao.querytools import FieldClause, FilterClause, JoinClause, OrderByClause, GroupByClause, EnumFilterTypes
+from core.dao.querytools import FieldClause, FilterClause, JoinClause, OrderByClause, GroupByClause, EnumFilterTypes, \
+    EnumJoinTypes
 from core.exception.exceptionhandler import BugBarrier
 from core.model.modeldefinition import BaseEntity
 from core.util.noconflict import makecls
@@ -140,16 +141,43 @@ class BaseService(object):
         return self._dao.select(filters=filters, order_by=order_by, fields=fields, group_by=group_by,
                                 joins=joins, offset=offset, limit=limit)
 
-    def select_by_id(self, id_value: any):
+    def select_by_id(self, id_value: any, joins: List[JoinClause] = None, fields: List[FieldClause] = None):
         """
         Devuelve un único registro de acuerdo al id pasado como parámetro. Devuelve None si no lo encuentra.
-        :param id_value:
+        :param id_value: Id de la entidad.
+        :param joins: Lista de joins.
+        :param fields: Lista de campos SELECT.
         :return: Entity.
         """
         # Uso la select normal pasando como único filtro el id.
         filters: List[FilterClause] = [FilterClause(self.get_entity_type().get_id_field_name(), EnumFilterTypes.EQUALS,
                                                     id_value)]
-        result = self.select(filters=filters, offset=0, limit=1)
+
+        entity_dict: dict = self.get_entity_type().get_model_dict()
+
+        # Añado una lista de campos para todos los de la entidad
+        if not fields or len(fields) <= 0:
+            fields = []
+
+            for k, v in entity_dict.items():
+                # Comprobar si es entidad anidada, en ese caso el formato del campo de la SELECT es "campo.*"
+                if v.referenced_table_name is not None:
+                    fields.append(FieldClause(f'{k}.*'))
+                else:
+                    fields.append(FieldClause(f'{k}'))
+
+        # Si no hay joins, añado los del nivel "base"
+        if not joins or len(joins) <= 0:
+            joins = []
+
+            for k, v in entity_dict.items():
+                # Para aquellos campos que sean referenciados, añadir un join clause (si es campo obligatorio,
+                # INNER_JOIN, si no lo es LEFT_JOIN).
+                if v.referenced_table_name is not None:
+                    joins.append(JoinClause(table_name=k, join_type=(EnumJoinTypes.INNER_JOIN if v.is_mandatory else
+                                                                     EnumJoinTypes.LEFT_JOIN)))
+
+        result = self.select(filters=filters, fields=fields, joins=joins, offset=0, limit=1)
         if result and len(result) > 0:
             return result[0]
         else:
