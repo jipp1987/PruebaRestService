@@ -167,13 +167,16 @@ class GroupByClause(object):
 class FieldClause(object):
     """Clase para modelado de campos SELECT para MySQL."""
 
-    def __init__(self, field_name: str, table_alias: str = None, field_alias: str = None):
+    def __init__(self, field_name: str, table_alias: str = None, field_alias: str = None, is_lazy_load: bool = False):
         self.field_name = field_name
         """Nombre del campo SELECT."""
         self.table_alias = table_alias
         """Alias de la tabla."""
         self.field_alias = field_alias
         """Alias del campo."""
+        self.is_lazy_load = is_lazy_load
+        """Se utiliza para saber si un campo del SELECT es un lazyload, es decir, se refiere a una entidad anidada 
+        pero sólo trae el id, no toda la entidad."""
 
 
 class JsonQuery(object):

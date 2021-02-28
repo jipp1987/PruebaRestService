@@ -1,7 +1,7 @@
 import abc
 import enum
 import threading
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from importlib.resources import Package
 from typing import Dict, Union, List, Tuple, Type
 
@@ -10,7 +10,8 @@ from dbutils.pooled_db import PooledDB, PooledSharedDBConnection, PooledDedicate
 
 from core.dao.mysqldaotools import resolve_field_clause, resolve_filter_clause, resolve_join_clause, \
     resolve_group_by_clause, resolve_order_by_clause, resolve_limit_offset, resolve_translation_of_clauses, \
-    get_field_names_as_str_for_insert, get_field_values_as_str_for_insert, get_fields_with_value_as_str_for_update
+    get_field_names_as_str_for_insert, get_field_values_as_str_for_insert, get_fields_with_value_as_str_for_update, \
+    resolve_translation_of_joins
 from core.dao.querytools import FilterClause, OrderByClause, EnumSQLOperationTypes, JoinClause, FieldClause, \
     GroupByClause
 from core.exception.exceptionhandler import CustomException
@@ -390,6 +391,100 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
         return result
 
+    def __complete_field_clause(self, field_clause: FieldClause, lazy_load_fields: Dict[str, any]) -> List[FieldClause]:
+        """
+        Para aquellas fieldclause con asterisco, se ha de sustituir ese campo por la selección de todos los de la
+        entidad.
+        :param field_clause:
+        :param lazy_load_fields: Mapa con los campos lazy load.
+        :return: List[FieldClause]
+        """
+        # Separar el campo por el punto: la entidad que hay que traer será la del último nivel de anidación partiendo de
+        # la entidad base.
+        field_name_array = field_clause.field_name.split(".")
+        # Al final devuelvo una nueva lista de field clause
+        new_field_list: List[FieldClause] = []
+
+        last_entity: Type[BaseEntity] = self.entity_type
+        field_name_array_last_index = len(field_name_array) - 1
+
+        key_for_lazy_load_dict: str
+
+        for idx, val in enumerate(field_name_array):
+            # Si es el último index, ése es el campo que quiero traer.
+            if idx == field_name_array_last_index:
+                for k, v in last_entity.get_model_dict().items():
+                    # Sólo considero campos que no sean entidades anidadas; ésas se han de resolver en su propio
+                    # FieldClause con asterisco.
+                    if v.referenced_table_name is None:
+                        # Añado un nuevo FieldClause, de tal manera que el campo sea la concatenación de los campos
+                        # anteriores con puntos más la clave en sustitución del asterisco
+                        new_field_list.append(FieldClause(field_name=field_clause.field_name.replace('*', k),
+                                                          table_alias=field_clause.table_alias))
+                    else:
+                        # Si llega hasta aquí, quiere decir que se ha seleccionado una entidad anidada en general, por
+                        # ejemplo entidad_1.entidad_1_1, sin añadir otros campos detrás. En ese caso es un lazyload, es
+                        # decir, se va a devolver al usuario un objeto de esa clase pero sólo con el id.
+                        # La clave es una concatenación de todos los campos hasta el último no incluido, añadiendo el
+                        # nombre del campo en el modelo de Python al final.
+                        if idx > 0:
+                            key_for_lazy_load_dict = f"{'.'.join(field_name_array[:-1])}.{k}"
+                        else:
+                            # En este caso, es un lazyload de la entidad base, no de una entidad anidada sobre la base.
+                            key_for_lazy_load_dict = k
+
+                        # No añado el campo inmediatamente, en su lugar lo guardo en el diccionario para comprobar si
+                        # más tarde si realmente lo quiero añadir.
+                        lazy_load_fields[key_for_lazy_load_dict] = FieldClause(field_name=key_for_lazy_load_dict,
+                                                                               table_alias=field_clause.table_alias,
+                                                                               is_lazy_load=True)
+            else:
+                # Si no es el último índice significa que es un campo anidado dentro de la entidad principal. Lo voy
+                # almacenando.
+                last_entity = last_entity.get_model_dict()[val].field_type  # noqa
+
+        return new_field_list
+
+    def __check_field_clauses(self, clauses_list: List[FieldClause], lazy_load_fields: Dict[str, any]):
+        """
+        Comprobar la lista de selección de campos, para añadir aquéllos que vayan a ser lazyload así como los que van
+        a venir con algún dato.
+        :param clauses_list: Lista de cláusulas de selección a comprobar.
+        :param lazy_load_fields: Mapa con los campos lazy load.
+        :return: None
+        """
+        # Guardo para cada posición la lista obtenida, para así luego sustituir por posición
+        replace_field_clause_map: OrderedDict[FieldClause, list] = OrderedDict()
+
+        for f in clauses_list:
+            if f.field_name.endswith('*'):
+                replace_field_clause_map[f] = self.__complete_field_clause(f, lazy_load_fields)
+
+        # Elimino las cláusulas con asterisco de las posiciones
+        if len(replace_field_clause_map) > 0:
+            for k in replace_field_clause_map.keys():
+                clauses_list.remove(k)
+
+            # Inserto las listas.
+            for v in replace_field_clause_map.values():
+                clauses_list.extend(v)
+
+        # Finalmente, añado los campos LazyLoad pero sólo si no encuentro ya campos que indiquen que la entidad se va a
+        # traer por completo.
+        add_to_list: bool
+        for k, v in lazy_load_fields.items():
+            add_to_list = True
+            for c in clauses_list:
+                # Si es un campo no lazyload y empieza por la clave, significa que se están trayendo campos concretos de
+                # ese objeto, por ejemplo cliente.tipo_cliente.codigo implica que no es lazyload, y si tengo una clave
+                # lazyload cliente.tipo_cliente he descartarla.
+                if not c.is_lazy_load and c.field_name.startswith(k):
+                    add_to_list = False
+                    break
+
+            if add_to_list:
+                clauses_list.append(v)
+
     def select(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
                order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
                group_by: List[GroupByClause] = None,
@@ -431,6 +526,15 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         if not fields or len(fields) <= 0:
             fields = [FieldClause(field_name='*')]
 
+        # Por defecto, desactivo cualquier lazyload que me llegue en los Fields, ese campo lo manejo yo sólo.
+        for f in fields:
+            f.is_lazy_load = False
+
+        # Diccionario con los campos lazyload, es decir, aquellos campos de entidades anidadas que no se cargan con
+        # todos los campos: sólo se carga el id de éste.
+        lazy_load_fields: Dict[str, any] = {}
+        # Comprobar cláusulas de selección
+        self.__check_field_clauses(fields, lazy_load_fields)
         fields_translated = resolve_translation_of_clauses(FieldClause, fields, self.entity_type, self.__table,
                                                            join_alias_table_name)
 
@@ -451,8 +555,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
         # Joins
         if joins and len(joins) > 0:
-            joins_translated = resolve_translation_of_clauses(JoinClause, joins, self.entity_type,
-                                                              self.__table, join_alias_table_name)
+            joins_translated = resolve_translation_of_joins(joins, self.entity_type, self.__table)
 
         # RESULTADO: Devuelve una lista de diccionarios
         result_as_dict = self.__select_internal(fields=fields_translated, filters=filters_translated,

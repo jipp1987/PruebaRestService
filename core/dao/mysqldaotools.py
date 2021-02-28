@@ -1,5 +1,4 @@
 import copy
-from collections import OrderedDict
 from typing import List, Union, Type, Dict, Tuple
 
 from core.dao.querytools import EnumFilterTypes, FilterClause, OrderByClause, JoinClause, GroupByClause, FieldClause
@@ -8,8 +7,10 @@ from core.model.modeldefinition import BaseEntity, FieldDefinition
 from core.util.i18nutils import translate
 from core.util.listutils import LoopIterationObject
 
-_field_alias_separator: str = "$$"
+_field_alias_separator: str = "$123$"
 """Separador de los alias de los campos, para la traducción del resultado de la consulta al modelo de Python."""
+_join_alias_separator: str = "$456$"
+"""Separador de los alias de los joins, para la traducción del resultado de la consulta al modelo de Python."""
 
 
 def resolve_filter_clause(iteration_object: LoopIterationObject, filtro_arr: List[str]):
@@ -161,61 +162,48 @@ def resolve_limit_offset(limit: int, offset: int = None) -> str:
     return limit_offset
 
 
-def __complete_field_clause(field_clause: FieldClause, base_entity_type: Type[BaseEntity]) -> List[FieldClause]:
-    """
-    Para aquellas fieldclause con asterisco, se ha de sustituir ese campo por la selección de todos los de la entidad.
-    :param field_clause:
-    :param base_entity_type:
-    :return: List[FieldClause]
-    """
-    # Separar el campo por el punto: la entidad que hay que traer será la del último nivel de anidación partiendo de la
-    # entidad base.
-    field_name_array = field_clause.field_name.split(".")
-    # Al final devuelvo una nueva lista de field clause
-    new_field_list: List[FieldClause] = []
-
-    last_entity: Type[BaseEntity] = base_entity_type
-    field_name_array_last_index = len(field_name_array) - 1
-
-    for idx, val in enumerate(field_name_array):
-        # Si es el último index, ése es el campo que quiero traer.
-        if idx == field_name_array_last_index:
-            for k, v in last_entity.get_model_dict().items():
-                # Sólo considero campos que no sean entidades anidadas; ésas se han de resolver en su propio FieldClause
-                # con asterisco.
-                if v.referenced_table_name is None:
-                    # Añado un nuevo FieldClause, de tal manera que el campo sea la concatenación de los campos
-                    # anteriores con puntos más la clave en sustitución del asterisco
-                    new_field_list.append(FieldClause(field_name=field_clause.field_name.replace('*', k),
-                                          table_alias=field_clause.table_alias))
-        else:
-            # Si no es el último índice significa que es un campo anidado dentro de la entidad principal. Lo voy
-            # almacenando.
-            last_entity = last_entity.get_model_dict()[val].field_type # noqa
-
-    return new_field_list
-
-
-def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_entity_type: Type[BaseEntity],
-                                   table_db_name: str,
-                                   join_alias_table_name: Dict[str, Tuple[str, Union[str, None],
-                                                                          Type[BaseEntity]]]):
+def resolve_translation_of_joins(clauses_list: list, base_entity_type: Type[BaseEntity], table_db_name: str):
     """
     Resuelve la traducción de select, filtros, order_by y group_by.
-    :param clause_type: Tipo de cláusula.
     :param clauses_list: Lista de cláusulas a traducir.
-    :param base_entity_type: Tipo de la entidad base de la tabla principal de la consulta.
     :param table_db_name: Nombre de la tabla principal de la consulta.
-    :param join_alias_table_name: Diccionario empleado para mantener una relación entre los alias de las tablas y
+    :param base_entity_type: Tipo de la entidad base de la tabla principal de la consulta.
     el nombre del campo en Python.
     :return: Lista de filtros, order, group o fields traducidos a mysql.
     """
-    # Si es un join, utiliza otro campo por el que hacer el split.
-    is_join_clause = clause_type == JoinClause
+    join_alias_dict: Dict[str, str] = {}
+    """Lo utilizo para guardar una correlación entre los nombres de las tablas en la base de datos y el alias que le 
+    doy en la consulta."""
 
+    # Resolver la lista de joins
+    clauses_translated: list = __resolve_translation_of_joins_internal(clauses_list, base_entity_type, table_db_name,
+                                                                       join_alias_dict)
+    # Si se ha hecho un join a un campo anidado de un campo anidado, tengo que resolver el nombre de la tabla padre de
+    # tal manera que coincida con el alias de dicha tabla resuelto en un paso anterior: por ejemplo, hago join de
+    # clientes a tipos de cliente (alias tipo_cliente), y luego join de tipos de cliente al usuario de creación, con
+    # lo cual el alias es el mismo resuelto en el paso anterior, tipo_cliente.
+    for c in clauses_translated:
+        if c.parent_table in join_alias_dict:
+            c.parent_table = join_alias_dict[c.parent_table]
+
+    return clauses_translated
+
+
+def __resolve_translation_of_joins_internal(clauses_list: list, base_entity_type: Type[BaseEntity], table_db_name: str,
+                                            join_alias_dict: Dict[str, str]) -> list:
+    """
+    Resuelve la traducción de select, filtros, order_by y group_by.
+    :param clauses_list: Lista de cláusulas a traducir.
+    :param table_db_name: Nombre de la tabla principal de la consulta.
+    :param base_entity_type: Tipo de la entidad base de la tabla principal de la consulta.
+    el nombre del campo en Python.
+    :param join_alias_dict: Lo utilizo para guardar una correlación entre los nombres de las tablas en la base de datos
+    y el alias que le doy en la consulta
+    :return: Lista de filtros, order, group o fields traducidos a mysql.
+    """
     # Declaración de campos a asignar en bucle
     clauses_translated = []
-    new_clause: clause_type
+    new_clause: JoinClause
     field_definition: Union[FieldDefinition, None]
     new_table_alias: Union[str, None]
     field_name_array: List[str]
@@ -226,36 +214,17 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
     """Esto lo uso para los joins, para poder mantenerlos relacionados. La clave es el nombre del campo y el valor 
     es el nombre real de la tabla en la base de datos."""
 
-    # Si es un fieldclause y el campo termina en asterisco, significa que se quieren seleccionar todos los campos.
-    if clause_type == FieldClause:
-        # Guardo para cada posición la lista obtenida, para así luego sustituir por posición
-        replace_field_clause_map: OrderedDict[FieldClause, list] = OrderedDict()
-
-        for f in clauses_list:
-            if f.field_name.endswith('*'):
-                replace_field_clause_map[f] = __complete_field_clause(f, base_entity_type)
-
-        # Elimino las cláusulas con asterisco de las posiciones
-        if len(replace_field_clause_map) > 0:
-            for k in replace_field_clause_map.keys():
-                clauses_list.remove(k)
-
-            # Inserto las listas.
-            for v in replace_field_clause_map.values():
-                clauses_list.extend(v)
-
     for f in clauses_list:
         # Copio el objeto entrante
         new_clause = copy.deepcopy(f)
 
         field_definition = None
         new_table_alias = None
-        entity_type = None
 
         # Si el campo viene con este formato: campo_tabla_1.campo_tabla_2.campo_tabla_3... significa que es
         # un campo de una clase anidada en el modelo.
         # Separo el nombre del campo por el punto
-        field_name_array = new_clause.table_name.split(".") if is_join_clause else new_clause.field_name.split(".")
+        field_name_array = new_clause.table_name.split(".")
 
         # De lo que se trata ahora es de ir explorando los campos para resolver la clase exacta del objeto,
         # así como los atributos del mapeo relacional.
@@ -276,20 +245,20 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
                     # En último índice, antes de volver a reasignar la definición de campo, me quedo con
                     # algunos datos de la penúltima (que este de hecho la clase a la que pertenece el campo
                     # como tal).
-                    if is_join_clause:
-                        # Lo que pretendo con esto es mantener una relación entre las tablas para que la cláusula
-                        # join de la consulta sea correcta. Hay tres posibilidades:
-                        # 1. Se ha especificado un alias para la tabla: en ese caso, se usa el alias sin más.
-                        # 2. Es un join desde la tabla principal del dao a una tabla anidada: en ese caso, la tabla
-                        # padre es la del propio dao.
-                        # 3. Es un join a una tabla anidada dentro de otra tabla anidada. En ese caso, lo que hago
-                        # es usar el diccionario de definiciones de campo y acceder al que está una posición
-                        # atrás, dado que el campo referenced_table_name hará referencia al nombre en la base de
-                        # datos de la tabla padre del campo final: cliente.tipo_cliente.usuario -> En este caso voy
-                        # a hacer join a usuario, su tabla padre es tipo_cliente, la definición de campo que
-                        # contiene el nombre de la tabla de tipos de cliente está en clientes.
-                        new_clause.parent_table = new_clause.parent_table if new_clause.parent_table is not None \
-                            else (table_db_name if idx == 1 else join_parent_table_dict[field_name_array[-1]])
+                    # Lo que pretendo con esto es mantener una relación entre las tablas para que la cláusula
+                    # join de la consulta sea correcta. Hay tres posibilidades:
+                    # 1. Se ha especificado un alias para la tabla: en ese caso, se usa el alias sin más.
+                    # 2. Es un join desde la tabla principal del dao a una tabla anidada: en ese caso, la tabla
+                    # padre es la del propio dao.
+                    # 3. Es un join a una tabla anidada dentro de otra tabla anidada. En ese caso, lo que hago
+                    # es usar el diccionario de definiciones de campo y acceder al que está una posición
+                    # atrás, dado que el campo referenced_table_name hará referencia al nombre en la base de
+                    # datos de la tabla padre del campo final: cliente.tipo_cliente.usuario -> En este caso voy
+                    # a hacer join a usuario, su tabla padre es tipo_cliente, la definición de campo que
+                    # contiene el nombre de la tabla de tipos de cliente está en clientes.
+                    field_definition = field_definition.field_type.get_model_dict().get(val)
+                    new_clause.parent_table = new_clause.parent_table if new_clause.parent_table is not None \
+                        else join_parent_table_dict[field_name_array[field_name_array_last_index - idx]]
 
                     # Si no tiene alias, el alias es la concatenación de todos los campos anidados hasta el íncidice
                     # final no incluido, reemplazando los puntos por guiones. Lo hago así para evitar errores cuando
@@ -297,13 +266,7 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
                     # que coja todos los elementos, lo de llegar hasta el penúltimo es para el resto porque las join
                     # clauses son las distintas tablas como tal y el resto de cláusulas son campos de las mismas.
                     new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else \
-                        ''.join(field_name_array[0:] if is_join_clause else
-                                field_name_array[0:-1]).replace('.', _field_alias_separator)
-                    # Lo compruebo por si acaso, pero no debería hacer falta, si llega hasta aquí el tipo debe ser
-                    # BaseEntity.
-                    if issubclass(field_definition.field_type, BaseEntity):
-                        entity_type = field_definition.field_type
-                        field_definition = entity_type.get_model_dict().get(val)  # noqa
+                        _join_alias_separator.join(field_name_array)
 
                 # Añadir al mapa de los joins una clave-valor: clave es el nombre del campo, valor es la tabla
                 # relacionada.
@@ -311,26 +274,20 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
         else:
             # En caso de que sea un campo normal, el alias será el que venga en la entidad o bien el nombre de
             # la tabla del DAO.
-            field_definition = base_entity_type.get_model_dict().get(f.table_name if is_join_clause
-                                                                     else f.field_name)
-            # Si es una join clause:
-            if is_join_clause:
-                # La tabla padre será la del propio dao
-                new_clause.parent_table = new_clause.parent_table if new_clause.parent_table is not None \
-                    else table_db_name
-            else:
-                new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else table_db_name
-                # Si no es una join clause y sólo hay un campo tras el split, la entidad será la del dao
-                entity_type = base_entity_type
+            field_definition = base_entity_type.get_model_dict().get(f.table_name)
+            # La tabla padre será la del propio dao
+            new_clause.parent_table = new_clause.parent_table if new_clause.parent_table is not None \
+                else table_db_name
 
         # Parte especial para cláusulas join
-        if is_join_clause and field_definition is not None:
+        if field_definition is not None:
             # La tabla será la tabla referenciada
             new_clause.table_name = field_definition.referenced_table_name
 
             # El alias será también el nombre de la tabla
-            new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else \
-                field_name_array[-1]
+            if new_table_alias is None:
+                new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else \
+                    field_name_array[-1]
 
             # Nombre del campo id de la clase
             if new_clause.id_column_name is None:
@@ -343,6 +300,111 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
             # Nombre del campo referenciado en la base de datos
             if new_clause.parent_table_referenced_column_name is None:
                 new_clause.parent_table_referenced_column_name = field_definition.name_in_db
+
+        # Lanzar error si no existe uno de estos objetos
+        if field_definition is None or new_table_alias is None:
+            raise CustomException(translate("i18n_base_commonError_query_translate", None, str(new_clause)))
+
+        # Sustituyo el nombre del campo por el equivalente en la base de datos
+        new_clause.field_name = field_definition.name_in_db
+        # Asignar el alias de la tabla resuelto anteriormente
+        # Si es una join clause, si no hay alias debe utilizar lo que especifique la definición del campo
+        new_clause.table_alias = new_table_alias
+
+        # Añadir al mapa de joins y alias una nueva clave-valor: la clave es el nombre de la tabla referenciada y el
+        # valor es el nombre del join
+        if new_clause.table_name not in join_alias_dict:
+            join_alias_dict[new_clause.table_name] = new_clause.table_alias
+
+        # Lo añado a la lista
+        clauses_translated.append(new_clause)
+
+    return clauses_translated
+
+
+def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_entity_type: Type[BaseEntity],
+                                   table_db_name: str,
+                                   join_alias_table_name: Dict[str, Tuple[str, Union[str, None],
+                                                                          Type[BaseEntity]]]):
+    """
+    Resuelve la traducción de select, filtros, order_by y group_by.
+    :param clause_type: Tipo de cláusula.
+    :param clauses_list: Lista de cláusulas a traducir.
+    :param base_entity_type: Tipo de la entidad base de la tabla principal de la consulta.
+    :param table_db_name: Nombre de la tabla principal de la consulta.
+    :param join_alias_table_name: Diccionario empleado para mantener una relación entre los alias de las tablas y
+    el nombre del campo en Python.
+    :return: Lista de filtros, order, group o fields traducidos a mysql.
+    """
+    # Declaración de campos a asignar en bucle
+    clauses_translated = []
+    new_clause: clause_type
+    field_definition: Union[FieldDefinition, None]
+    new_table_alias: Union[str, None]
+    field_name_array: List[str]
+    field_name_array_last_index: int
+    entity_type: Union[Type[BaseEntity], None]
+
+    join_parent_table_dict: Dict[str, str]
+    """Esto lo uso para los joins, para poder mantenerlos relacionados. La clave es el nombre del campo y el valor 
+    es el nombre real de la tabla en la base de datos."""
+
+    for f in clauses_list:
+        # Copio el objeto entrante
+        new_clause = copy.deepcopy(f)
+
+        field_definition = None
+        new_table_alias = None
+        entity_type = None
+
+        # Si el campo viene con este formato: campo_tabla_1.campo_tabla_2.campo_tabla_3... significa que es
+        # un campo de una clase anidada en el modelo.
+        # Separo el nombre del campo por el punto
+        field_name_array = new_clause.field_name.split(".")
+
+        # De lo que se trata ahora es de ir explorando los campos para resolver la clase exacta del objeto,
+        # así como los atributos del mapeo relacional.
+        field_name_array_last_index = len(field_name_array) - 1
+        if field_name_array_last_index > 0:
+            join_parent_table_dict = {}
+
+            for idx, val in enumerate(field_name_array):
+                # Todos los índices menos el último serán campos relacionales hacia otras entidades.
+                if idx == 0:
+                    # El primero será el de la propia clase del DAO actual
+                    field_definition = base_entity_type.get_model_dict().get(val)
+                elif idx < field_name_array_last_index:
+                    # Voy almacenando la última definición de campo para reutilizarla justo antes de resolver el
+                    # último valor.
+                    field_definition = field_definition.field_type.get_model_dict().get(val)  # noqa
+                else:
+                    # En último índice, antes de volver a reasignar la definición de campo, me quedo con
+                    # algunos datos de la penúltima (que este de hecho la clase a la que pertenece el campo
+                    # como tal).
+                    # Si no tiene alias, el alias es la concatenación de todos los campos anidados hasta el íncidice
+                    # final no incluido, reemplazando los puntos por guiones. Lo hago así para evitar errores cuando
+                    # dos tablas tienen un campo que se llama igual y quiero traerme los dos. Si es una join clause,
+                    # que coja todos los elementos, lo de llegar hasta el penúltimo es para el resto porque las join
+                    # clauses son las distintas tablas como tal y el resto de cláusulas son campos de las mismas.
+                    new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else \
+                        _join_alias_separator.join(field_name_array[0:-1])
+                    # Lo compruebo por si acaso, pero no debería hacer falta, si llega hasta aquí el tipo debe ser
+                    # BaseEntity.
+                    if issubclass(field_definition.field_type, BaseEntity):
+                        entity_type = field_definition.field_type
+                        field_definition = entity_type.get_model_dict().get(val)  # noqa
+
+                # Añadir al mapa de los joins una clave-valor: clave es el nombre del campo, valor es la tabla
+                # relacionada.
+                join_parent_table_dict[val] = field_definition.referenced_table_name
+        else:
+            # En caso de que sea un campo normal, el alias será el que venga en la entidad o bien el nombre de
+            # la tabla del DAO.
+            field_definition = base_entity_type.get_model_dict().get(f.field_name)
+
+            new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else table_db_name
+            # Si no es una join clause y sólo hay un campo tras el split, la entidad será la del dao
+            entity_type = base_entity_type
 
         # Lanzar error si no existe uno de estos objetos
         if field_definition is None or new_table_alias is None or (clause_type == FieldClause
@@ -358,7 +420,7 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
         # Establecer alias de los campos seleccionados, lo necesito para transformar el resultado de la consulta
         # en objetos Python. En este caso el alias lo establezco yo, ignorando lo que me pueda haber llegado.
         if clause_type == FieldClause:
-            f_alias = '-'.join(new_clause.table_alias.split('.'))
+            f_alias = _field_alias_separator.join(new_clause.table_alias.split('.'))
             f_alias = f'{f_alias}{_field_alias_separator}{field_name_array[-1]}'
             new_clause.field_alias = f_alias
 
