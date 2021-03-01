@@ -1,4 +1,5 @@
 import abc
+import copy
 import enum
 import threading
 from collections import namedtuple, OrderedDict
@@ -313,7 +314,8 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
     def __from_query_result_dict_to_entity(self, result_as_dict: List[dict],
                                            join_alias_table_name: Dict[str, Tuple[str, Union[str, None],
-                                                                                  Type[BaseEntity]]]) -> \
+                                                                                  Type[BaseEntity]]],
+                                           lazy_load_fields: List[str]) -> \
             List[BaseEntity]:
         """
         Método interno para convertir una lista de diccionarios resultado de una consulta al modelo de entidades
@@ -321,6 +323,8 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         :param result_as_dict: Resultado de la query como una lista de diccionarios.
         :param join_alias_table_name: Relación de campos durante la fase de traducción respecto a los alias de la
         consulta.
+        :param lazy_load_fields: Lista de campos lazy_load. Si un campo es lazyload implica que es un campo anidado que
+        llegará con todos los campos null salvo el id.
         :return: List[BaseEntity]
         """
         # Resultado
@@ -337,6 +341,19 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # diccionarios.
         nested_field_array: list
         last_dict: dict
+
+        new_entity: BaseEntity
+
+        # Comprobar lazyloads
+        cursor: BaseEntity
+        cursor_dict: dict
+        id_for_lazy_property: any
+        type_for_lazy_property: Type[BaseEntity]
+
+        check_lazy_loads: bool = False
+        lazy_load_fields_array: List[str]
+        if lazy_load_fields is not None and len(lazy_load_fields) > 0:
+            check_lazy_loads = True
 
         # Cada resultado es un diccionario, como una fila del resultado de la consulta.
         for row in result_as_dict:
@@ -387,7 +404,42 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                     row[key_name] = row.pop(k)
                     row[key_name] = field_value
 
-            result.append(self.entity_type.convert_dict_to_entity(row))
+            new_entity = self.entity_type.convert_dict_to_entity(values_dict=row)
+
+            # Tengo que comprobar los campos lazyload: de la conversión a diccionario ha salido con estos campos no como
+            # entidades sino como un entero. Hay que instanciar nuevos campos de esas entidades con todos los campos
+            # vacíos salvo el id.
+            if check_lazy_loads:
+                for f in lazy_load_fields:
+                    # Empiezo el cursor en la nueva entidad, se trata de llegar hasta la última propiedad e instanciarla
+                    # como un nuevo objeto del tipo que sea con todos los campos None salvo el id.
+                    cursor = new_entity
+
+                    lazy_load_fields_array = f.split(".")
+                    # Recorro hasta el penúltimo campo del split
+                    for x in lazy_load_fields_array[:-1]:
+                        cursor = getattr(cursor, x)
+
+                    # Esto es el id de la nueva entidad que voy a instanciar. También accedo al diccionario de la
+                    # entidad para obtener el tipo a instanciar.
+                    id_for_lazy_property = getattr(cursor, lazy_load_fields_array[-1])
+                    cursor_dict = type(cursor).get_model_dict()
+                    type_for_lazy_property = cursor_dict[lazy_load_fields_array[-1]].field_type
+
+                    # Cojo el diccionario del objeto a instanciar, pero OJO!!! porque hay que clonarlo porque si lo
+                    # cambio sin clonarlo modifico el comportamiento de la clase!!!
+                    cursor_dict = copy.deepcopy(type_for_lazy_property.get_model_dict())
+                    # Si la clave coincide con el nombre de la clave principal, su valor es el que venga de la consulta.
+                    # Cualquier otro campo es None.
+                    for k in cursor_dict.keys():
+                        cursor_dict[k] = id_for_lazy_property if k == type_for_lazy_property.get_id_field_name() \
+                            else None
+                            
+                    # Establezco el atributo instanciando un nuevo objeto del campo lazyload: utilizo el diccionario
+                    # anterior y el operador ** para descomponerlo en argumentos clave-valor (quito el warning).
+                    setattr(cursor, lazy_load_fields_array[-1], type_for_lazy_property(**cursor_dict)) # noqa
+
+            result.append(new_entity)
 
         return result
 
@@ -445,20 +497,23 @@ class BaseDao(object, metaclass=abc.ABCMeta):
 
         return new_field_list
 
-    def __check_field_clauses(self, clauses_list: List[FieldClause], lazy_load_fields: Dict[str, any]):
+    def __check_field_clauses(self, clauses_list: List[FieldClause]):
         """
         Comprobar la lista de selección de campos, para añadir aquéllos que vayan a ser lazyload así como los que van
         a venir con algún dato.
         :param clauses_list: Lista de cláusulas de selección a comprobar.
-        :param lazy_load_fields: Mapa con los campos lazy load.
         :return: None
         """
+        lazy_load_fields_dict: Dict[str, any] = {}
+        """# Diccionario con los campos lazyload, es decir, aquellos campos de entidades anidadas que no se cargan con
+        # todos los campos: sólo se carga el id de éste."""
+
         # Guardo para cada posición la lista obtenida, para así luego sustituir por posición
         replace_field_clause_map: OrderedDict[FieldClause, list] = OrderedDict()
 
         for f in clauses_list:
             if f.field_name.endswith('*'):
-                replace_field_clause_map[f] = self.__complete_field_clause(f, lazy_load_fields)
+                replace_field_clause_map[f] = self.__complete_field_clause(f, lazy_load_fields_dict)
 
         # Elimino las cláusulas con asterisco de las posiciones
         if len(replace_field_clause_map) > 0:
@@ -472,12 +527,12 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         # Finalmente, añado los campos LazyLoad pero sólo si no encuentro ya campos que indiquen que la entidad se va a
         # traer por completo.
         add_to_list: bool
-        for k, v in lazy_load_fields.items():
+        for k, v in lazy_load_fields_dict.items():
             add_to_list = True
             for c in clauses_list:
                 # Si es un campo no lazyload y empieza por la clave, significa que se están trayendo campos concretos de
                 # ese objeto, por ejemplo cliente.tipo_cliente.codigo implica que no es lazyload, y si tengo una clave
-                # lazyload cliente.tipo_cliente he descartarla.
+                # lazyload cliente.tipo_cliente he de descartarla.
                 if not c.is_lazy_load and c.field_name.startswith(k):
                     add_to_list = False
                     break
@@ -530,11 +585,10 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         for f in fields:
             f.is_lazy_load = False
 
-        # Diccionario con los campos lazyload, es decir, aquellos campos de entidades anidadas que no se cargan con
-        # todos los campos: sólo se carga el id de éste.
-        lazy_load_fields: Dict[str, any] = {}
         # Comprobar cláusulas de selección
-        self.__check_field_clauses(fields, lazy_load_fields)
+        self.__check_field_clauses(fields)
+        # Uso List comprehension para quedarme con aquellos campos que son lazy_load.
+        lazy_load_fields: List[str] = [x.field_name for x in fields if x.is_lazy_load is True]
         fields_translated = resolve_translation_of_clauses(FieldClause, fields, self.entity_type, self.__table,
                                                            join_alias_table_name)
 
@@ -567,7 +621,8 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         if result_as_dict is not None and len(result_as_dict) > 0:
             # Recorrer lista de diccionarios e ir transformando cada valor en una entidad base
             result = self.__from_query_result_dict_to_entity(result_as_dict=result_as_dict,
-                                                             join_alias_table_name=join_alias_table_name)
+                                                             join_alias_table_name=join_alias_table_name,
+                                                             lazy_load_fields=lazy_load_fields)
         else:
             result = []
 
