@@ -589,27 +589,33 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         self.__check_field_clauses(fields)
         # Uso List comprehension para quedarme con aquellos campos que son lazy_load.
         lazy_load_fields: List[str] = [x.field_name for x in fields if x.is_lazy_load is True]
-        fields_translated = resolve_translation_of_clauses(FieldClause, fields, self.entity_type, self.__table,
-                                                           join_alias_table_name)
+        fields_translated = resolve_translation_of_clauses(clause_type=FieldClause, clauses_list=fields,
+                                                           base_entity_type=self.entity_type,
+                                                           table_db_name=self.__table,
+                                                           join_alias_table_name=join_alias_table_name)
 
         # Filtros
         if filters and len(filters) > 0:
-            filters_translated = resolve_translation_of_clauses(FilterClause, filters, self.entity_type, self.__table,
-                                                                join_alias_table_name)
+            filters_translated = resolve_translation_of_clauses(clause_type=FilterClause, clauses_list=filters,
+                                                                base_entity_type=self.entity_type,
+                                                                table_db_name=self.__table)
 
         # Order by
         if order_by and len(order_by) > 0:
-            order_by_translated = resolve_translation_of_clauses(OrderByClause, order_by, self.entity_type,
-                                                                 self.__table, join_alias_table_name)
+            order_by_translated = resolve_translation_of_clauses(clause_type=OrderByClause, clauses_list=order_by,
+                                                                 base_entity_type=self.entity_type,
+                                                                 table_db_name=self.__table)
 
         # Group by
         if group_by and len(group_by) > 0:
-            group_by_translated = resolve_translation_of_clauses(GroupByClause, group_by, self.entity_type,
-                                                                 self.__table, join_alias_table_name)
+            group_by_translated = resolve_translation_of_clauses(clause_type=GroupByClause, clauses_list=group_by,
+                                                                 base_entity_type=self.entity_type,
+                                                                 table_db_name=self.__table)
 
         # Joins
         if joins and len(joins) > 0:
-            joins_translated = resolve_translation_of_joins(joins, self.entity_type, self.__table)
+            joins_translated = resolve_translation_of_joins(clauses_list=joins, base_entity_type=self.entity_type,
+                                                            table_db_name=self.__table)
 
         # RESULTADO: Devuelve una lista de diccionarios
         result_as_dict = self.__select_internal(fields=fields_translated, filters=filters_translated,
