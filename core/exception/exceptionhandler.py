@@ -106,7 +106,7 @@ class BugBarrier(type):
         # dinámicamente
         for attr_name, attr_value in attrs.items():
             # si es una función, le añado el decorador
-            if isinstance(attr_value, types.FunctionType):
+            if isinstance(attr_value, types.FunctionType): # noqa
                 # descarto las funciones heredadas de object, que empiezan y acaban en "__"
                 if callable(attr_value) and not attr_name.startswith("__"):
                     # A la función le añado el decorador catch_exceptions

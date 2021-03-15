@@ -289,7 +289,12 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
 
                 # Añadir al mapa de los joins una clave-valor: clave es el nombre del campo, valor es la tabla
                 # relacionada.
-                join_parent_table_dict[val] = field_definition.referenced_table_name
+                try:
+                    join_parent_table_dict[val] = field_definition.referenced_table_name
+                except AttributeError:
+                    # Si se produce esta excepción, es que se ha enviado un campo que no existe
+                    raise CustomException(
+                        translate("i18n_base_commonError_unknown_field", None, val, field_name_array[idx - 1]))
         else:
             # En caso de que sea un campo normal, el alias será el que venga en la entidad o bien el nombre de
             # la tabla del DAO.
@@ -303,6 +308,11 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
                 # Si no es una join clause y sólo hay un campo tras el split, la entidad será la del dao
                 new_table_alias = new_clause.table_alias if new_clause.table_alias is not None else table_db_name
                 entity_type = base_entity_type
+
+                # Si en este punto fuese null la definición de campo, es que dicho campo no existe.
+                if field_definition is None:
+                    raise CustomException(
+                        translate("i18n_base_commonError_unknown_field", None, f.field_name, base_entity_type.__name__))
 
         # Parte especial para cláusulas join
         if is_join_clause and field_definition is not None:

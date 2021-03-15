@@ -40,3 +40,6 @@ msgstr "Se ha producido un error con alguno de los campos del objeto."
 
 msgid "i18n_base_commonError_query_translate"
 msgstr "Se produjo un error con una cláusula durante la traducción de la consulta: %s."
+
+msgid "i18n_base_commonError_unknown_field"
+msgstr "El campo %s no existe en la entidad %s."

@@ -220,7 +220,11 @@ class RestController(flask_restful.Resource):
         except CustomException as e:
             # Se produce algún error
             print(str(e))
-            result = translate("i18n_base_commonError_request", None, *[e.known_error])
+            # Si hay error conocido, pasarlo en el mensaje de error, sino enviar su representación en forma de string.
+            error: str = e.known_error if e.known_error is not None else (str(e.exception) if e.exception is not None
+                                                                          else str(e))
+            result = translate("i18n_base_commonError_request", None, *[error])
+
             response_body = RequestResponse(response_object=result, success=False,
                                             status_code=EnumHttpResponseStatusCodes.BAD_REQUEST.value)
 
