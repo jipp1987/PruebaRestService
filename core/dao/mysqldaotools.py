@@ -7,6 +7,58 @@ from core.model.modeldefinition import BaseEntity, FieldDefinition
 from core.util.i18nutils import translate
 from core.util.listutils import LoopIterationObject
 
+"""
+
+La idea es tener una clase que, según el motor de base de datos elegido, transforme listas de cláusulas-objectos 
+FilterClause, OrderByClause, JoinClause, GroupByClause y FieldClause enviadas desde BaseDao y que están formadas no 
+según el modelo de la base de datos, sino según los objetos que representan dicho modelo en Python: de ese modo, cuando 
+desde un cliente tengan que modelar los objetos de acuerdo a la api no tienen porqué conocer el modelo exacto en la 
+base de datos, sólo el modelo según Python. 
+
+Esta clase traducirá las cláusulas según Python a cláusulas según la base 
+de datos utilizando el mapa proporcionado por las entidades modeladas (get_model_dict, un mapa cuya clave es un string 
+con el nombre de cada campo en el modelo de Python y el valor un objeto FieldDefinition que contiene el nombre del campo 
+en la base de datos, el tipo de campo, si es obligatorio...). Al final se devuelve otro listado con las cláusulas para 
+que se transformen en una cláusula MySQL inteligible para el motor; las cláusulas originales pasadas como parámetro no 
+se modifican, se clonan y sobre ese clonado se van haciendo cambios para no modificar lo que el llamante ha pasado como 
+parámetro.
+
+La traducción como tal la realiza la función resolve_translation_of_clauses, pero depende del tipo de cláusula del 
+listado pasado como parámetro:
+- FieldClause: Campos de la cláusula SELECT. Si fuesen campos de otras entidades anidadas sobre la entidad principal, 
+vendrían con el formato campo1.campo2.campo3... Se hace un split por el punto, y se va buscando cada campo dentro del 
+mapa de relación con la base de datos. Lo que se intenta es generar un alias de tabla (usando el separador 
+_join_alias_separator) para identificar al campo en la query: por ejemplo, imaginemos que la entidad base es clientes, 
+y queremos acceder al campo username del usuario_creacion del tipo de cliente asociado a un cliente. En la FieldClause 
+según Python vendría tipo_cliente.usuario_creacion.username; lo que se hace es ir buscando poco a poco en las 
+FieldDefinitions de las clases implicadas, partiendo de la principal y navegando hasta el penúltimo campo del split, de 
+tal modo que al final el alias de la tabla para ese campo en la consulta final sería algo así como 
+tipo_cliente$456$usuario_creacion (observad que se utilizan los mismos nombres que los campos según Python, eso es 
+porque durante la traducción de las JoinClauses a cada tabla implicada se le pone como alias el nombre del campo según 
+Python, aunque el nombre de la tabla en sí es obviamente el auténtico de la base de datos). Durante la traducción de 
+estas cláusulas, además, se pasa como parámetro un mapa join_alias_table_name cuya clave es cada alias de campo y su 
+valor es una tupla con ciertos valores: este mapa se utiliza para que, tras ejecutar la consulta, se pueda transformar 
+el  resultado obtenido a una lista de objetos de Python (en lugar de un mapa que es lo que devuelve el conector de 
+MySQL). Para los alias de los campos se utiliza _field_alias_separator, para que la query se entienda mejor.
+- FilterClause: Muy parecido a los FieldClause, pero no hace falta pasarle el mapa de relación de alias de campos. 
+Traduce las cláusulas de filtrado.
+- OrderByClause: Muy parecido a los FieldClause, pero no hace falta pasarle el mapa de relación de alias de campos. 
+Traduce las cláusulas para ordenación de resultados.
+- GroupByClause: Muy parecido a los FieldClause, pero no hace falta pasarle el mapa de relación de alias de campos. 
+Traduce las cláusulas de agrupado.
+- JoinClause: Éste es un caso especial, para empezar la traducción de estas cláusulas parte de la función 
+resolve_translation_of_joins (que internamente llama a resolve_translation_of_clauses). El motivo de utilizar una 
+función a modo de "envoltura" es porque hay que ir rellenando un mapa join_alias_dict que se utiliza para saber si ya 
+se ha hecho Join a una tabla previamente, para utilizar el mismo alias que se le hubiere dado en su momento. En lo que 
+respecta a resolve_translation_of_clauses, también se hace split por el punto con la idea de poder ir resolviendo 
+posibles entidades anidadas desde la principal, pero el objetivo aquí es identificar las tablas que van a formar parte 
+del Join y asignarles un alias que será el nombre del campo según el modelo de Python (se utiliza _join_alias_separator 
+y cuando se forma el alias se utilizan todos los campos del split a diferencia de los casos anteriores, que llegan 
+hasta el penúltimo), de tal como que la traducción de tipo_cliente.usuario_creacion se traduciría como 
+tipo_cliente$456$usuario_creacion.
+
+"""
+
 _field_alias_separator: str = "$123$"
 """Separador de los alias de los campos, para la traducción del resultado de la consulta al modelo de Python."""
 _join_alias_separator: str = "$456$"
@@ -204,10 +256,11 @@ def resolve_translation_of_clauses(clause_type: type, clauses_list: list, base_e
     :param base_entity_type: Tipo de la entidad base de la tabla principal de la consulta.
     :param table_db_name: Nombre de la tabla principal de la consulta.
     :param join_alias_table_name: Diccionario empleado para mantener una relación entre los alias de las tablas y
-    el nombre del campo en Python.
+    el nombre del campo en Python. Sólo es necesario pasarlo como parámetro para la traducción de los FieldClauses.
     :param join_alias_dict: Lo utilizo para guardar una correlación entre los nombres de las tablas en la base de datos
-    y el alias que le doy en la consulta
-    :return: Lista de filtros, order, group o fields traducidos a mysql.
+    y el alias que le doy en la consulta. Sólo es necesario pasarlo como parámetro para la traducción de los
+    JoinClauses.
+    :return: Listado de cláusulas traducidos a mysql.
     """
     # Declaración de campos a asignar en bucle
     clauses_translated = []
