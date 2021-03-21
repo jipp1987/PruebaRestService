@@ -112,7 +112,7 @@ class RestController(flask_restful.Resource):
         :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
         """
         # Primero transformo el objeto json de LocalProxy a string json
-        json_format = encode_object_to_json(request_proxy.get_json())
+        json_format = encode_object_to_json(request_proxy.get_json(force=True))
         # Luego transformo el string json a un objeto RequestBody, pasando el tipo como parámetro
         request_body: RequestBody = decode_object_from_json(json_format, RequestBody)
         # Resolver acción
