@@ -10,6 +10,7 @@ from typing import List, Tuple
 
 import flask_restful
 from flask import Blueprint, request, Flask
+from flask_cors import CORS
 
 from core.dao.basedao import BaseDao
 from core.util.i18nutils import add_language_dictionaries
@@ -169,6 +170,9 @@ def create_and_run_app(api_name: str, controllers: List[Tuple[any, str]], resour
 
     # Registro en el objeto app el blueprint
     app_rest.register_blueprint(api_bp, url_prefix=f'/{api_name}')
+
+    # Usar la librería CORS para permitir request cross-origin.
+    CORS(app_rest)
 
     # Multihilo. Pero al ser un servidor para debug, es posible que sólo haya un hilo en ejecución.
     app_rest.run(debug=debug, threaded=threaded)
