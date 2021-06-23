@@ -17,11 +17,10 @@ class BaseService(object):
     # Llamo a la factoría de metaclases para que me "fusione" las dos metaclases que me interesan.
     __metaclass__ = makecls(BugBarrier, abc.ABCMeta)
 
-    def __init__(self, dao: BaseDao = None, entity_type: Type[BaseEntity] = None):
+    def __init__(self, dao: BaseDao = None):
         """
         Constructor.
         :param dao: DAO.
-        :param entity_type: Tipo de entidad.
         """
         self._dao = dao
         """Acceso a datos asociado al servicio."""

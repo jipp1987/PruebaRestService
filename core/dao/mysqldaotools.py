@@ -473,7 +473,7 @@ def get_field_values_as_str_for_insert(base_entity: BaseEntity, is_id_included: 
 
             # Hay que comprobar si el campo es de tipo BaseEntity, en ese caso habrá que usar el campo id de éste
             # como valor
-            if issubclass(value.field_type, BaseEntity):
+            if issubclass(value.field_type, BaseEntity) and v is not None:
                 # Con esto obtengo el valor del id del campo referenciado
                 v = getattr(v, type(v).get_id_field_name())
 
@@ -483,6 +483,8 @@ def get_field_values_as_str_for_insert(base_entity: BaseEntity, is_id_included: 
             elif isinstance(v, bytes):
                 # Si son bytes, decodificarlos como latin1
                 cadena += ", '" + v.decode("latin1") + "'"
+            elif v is None:
+                cadena += f", null"
             else:
                 cadena += ", " + str(v)
 
@@ -511,7 +513,7 @@ def get_fields_with_value_as_str_for_update(base_entity: BaseEntity):
 
             # Hay que comprobar si el campo es de tipo BaseEntity, en ese caso habrá que usar el campo id de éste
             # como valor
-            if issubclass(value.field_type, BaseEntity):
+            if issubclass(value.field_type, BaseEntity) and v is not None:
                 # Con esto obtengo el valor del id del campo referenciado
                 v = getattr(v, value.field_type.get_id_field_name())
 
@@ -521,6 +523,8 @@ def get_fields_with_value_as_str_for_update(base_entity: BaseEntity):
             elif isinstance(v, bytes):
                 # Si son bytes, decodificarlos como latin1
                 cadena = f"{cadena} , {value.name_in_db} = '{v.decode('latin1')}'"
+            elif v is None:
+                cadena = f"{cadena} , {value.name_in_db} = null"
             else:
                 cadena = f"{cadena} , {value.name_in_db} = {v}"
 

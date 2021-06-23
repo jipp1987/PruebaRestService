@@ -161,10 +161,6 @@ class RestController(flask_restful.Resource):
                 # En caso contrario, devolver la entidad directamente
                 return entity
         else:
-            # Si no hay id, lanzar error porque es imprescindible para actualizar
-            if getattr(result, id_field_name) is None:
-                raise CustomException(translate("i18n_base_commonError_not_id_in_update"))
-
             return result
 
     def _resolve_action(self, action: int, request_object: any):
