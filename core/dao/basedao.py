@@ -360,7 +360,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
             # Buscar equivalencia de campos de consulta / definición de campos.
             for k, v in join_alias_table_name.items():
                 # Busco la coincidencia y modifico "al vuelo" el diccionario de la fila.
-                field_value = row[k]
+                field_value = row[k.lower()]
                 field_name = v[0]
                 nested_field = v[1]
                 entity_type = v[2]
@@ -401,7 +401,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                 else:
                     # Sustituyo el alias de la tabla durante la consulta por el nombre de la clave en el
                     # diccionario
-                    row[key_name] = row.pop(k)
+                    row[key_name] = row.pop(k.lower())
                     row[key_name] = field_value
 
             new_entity = self.entity_type.convert_dict_to_entity(values_dict=row)
