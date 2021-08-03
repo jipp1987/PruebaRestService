@@ -434,10 +434,10 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                     for k in cursor_dict.keys():
                         cursor_dict[k] = id_for_lazy_property if k == type_for_lazy_property.get_id_field_name() \
                             else None
-                            
+
                     # Establezco el atributo instanciando un nuevo objeto del campo lazyload: utilizo el diccionario
                     # anterior y el operador ** para descomponerlo en argumentos clave-valor (quito el warning).
-                    setattr(cursor, lazy_load_fields_array[-1], type_for_lazy_property(**cursor_dict)) # noqa
+                    setattr(cursor, lazy_load_fields_array[-1], type_for_lazy_property(**cursor_dict))  # noqa
 
             result.append(new_entity)
 
@@ -540,15 +540,13 @@ class BaseDao(object, metaclass=abc.ABCMeta):
             if add_to_list:
                 clauses_list.append(v)
 
-    def select(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
-               order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
-               group_by: List[GroupByClause] = None,
-               offset: int = None, limit: int = None) -> List[BaseEntity]:
+    def __select_common(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
+                        order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
+                        group_by: List[GroupByClause] = None,
+                        offset: int = None, limit: int = None,
+                        is_count: bool = False) -> tuple:
         """
-        Ejecuta una consulta SELECT sobre la tabla principal del dao. En importante tener en cuenta que aquellos campos
-        que no se hayan seleccionado llegarán invariablemente como null en los objetos resultantes, independientemente
-        de qué valor tengan en la base de datos; evidentemente, un campo que se haya seleccionado y llegue como null en
-        el objeto resultante significa que en la base de datos es null.
+        Parte común de consultas select.
         :param fields: Campos seleccionados. Para seleccionar todos los campos de una de las entidades, pasar asterisco.
         No se traerán los campos de entidades anidadas: para ello, habrá que poner otro FieldClause con el
         nombre del campo a traer (partiendo de la entidad base) seguido de asterisco: 'entidad_anidada_1.*',
@@ -559,7 +557,9 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         :param group_by: Cláusulas GROUP BY.
         :param offset: Offset del límite de la consulta.
         :param limit: Límite de registros.
-        :return: Lista de entidades encontradas.
+        :param is_count: Si es un recuento, se añade COUNT() a la select. False por defecto.
+        :return: Tupla de tres elementos: Lista de entidades encontradas, diccionario de relación entre alias de las
+        tablas especificadas, y campos lazy_load.
         """
         # declaro una serie de campos para pasar a la función interna, asumiendo primero que son null.
         filters_translated = None
@@ -621,7 +621,39 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         result_as_dict = self.__select_internal(fields=fields_translated, filters=filters_translated,
                                                 order_by=order_by_translated, joins=joins_translated,
                                                 group_by=group_by_translated, offset=offset,
-                                                limit=limit)
+                                                limit=limit, is_count=is_count)
+
+        return result_as_dict, join_alias_table_name, lazy_load_fields
+
+    def select(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
+               order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
+               group_by: List[GroupByClause] = None,
+               offset: int = None, limit: int = None) -> List[BaseEntity]:
+        """
+        Ejecuta una consulta SELECT sobre la tabla principal del dao. En importante tener en cuenta que aquellos campos
+        que no se hayan seleccionado llegarán invariablemente como null en los objetos resultantes, independientemente
+        de qué valor tengan en la base de datos; evidentemente, un campo que se haya seleccionado y llegue como null en
+        el objeto resultante significa que en la base de datos es null.
+        :param fields: Campos seleccionados. Para seleccionar todos los campos de una de las entidades, pasar asterisco.
+        No se traerán los campos de entidades anidadas: para ello, habrá que poner otro FieldClause con el
+        nombre del campo a traer (partiendo de la entidad base) seguido de asterisco: 'entidad_anidada_1.*',
+        'entidad_anidada_1.entidad_anidada_1_1.*...'.
+        :param filters: Filtros.
+        :param order_by: Cláusulas ORDER BY.
+        :param joins: Cláusulas JOIN.
+        :param group_by: Cláusulas GROUP BY.
+        :param offset: Offset del límite de la consulta.
+        :param limit: Límite de registros.
+        :return: Lista de entidades encontradas.
+        """
+        # RESULTADO: Devuelve una lista de diccionarios
+        select_result: tuple = self.__select_common(fields=fields, filters=filters, order_by=order_by, joins=joins,
+                                                    group_by=group_by, offset=offset, limit=limit)
+
+        # El resultado anterior devuelve los tres valores
+        result_as_dict: List[dict] = select_result[0]
+        join_alias_table_name: Dict[str, Tuple[str, Union[str, None], Type[BaseEntity]]] = select_result[1]
+        lazy_load_fields: List[str] = select_result[2]
 
         result: List[BaseEntity]
         if result_as_dict is not None and len(result_as_dict) > 0:
@@ -637,7 +669,8 @@ class BaseDao(object, metaclass=abc.ABCMeta):
     def __select_internal(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
                           order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
                           group_by: List[GroupByClause] = None,
-                          offset: int = None, limit: int = None) -> List[dict]:
+                          offset: int = None, limit: int = None,
+                          is_count: bool = False) -> List[dict]:
         """
         Ejecuta una consulta SELECT sobre la tabla principal del dao. Función interna con los campos ya traducidos al
         modelo de datos.
@@ -648,6 +681,7 @@ class BaseDao(object, metaclass=abc.ABCMeta):
         :param group_by: Cláusulas GROUP BY.
         :param offset: Offset del límite de la consulta.
         :param limit: Límite de registros.
+        :param is_count: Si es un recuento, se añade COUNT() a la select. False por defecto.
         :return: Diccionario.
         """
         # Resuelto SELECT (por defecto, asterisco para todos los campos)
@@ -711,7 +745,11 @@ class BaseDao(object, metaclass=abc.ABCMeta):
             limit_offset = resolve_limit_offset(limit=limit, offset=offset)
 
         # Ejecutar query
-        sql = f"SELECT {select.strip()} FROM {self.__table} {join.strip()} {filtro.strip()} " \
+        # TODO Solución temporal para manejar los count, lo suyo sería tener un sistema para manejar cualquier función
+        # de agregado o recuento, pero de momento lo dejo así
+        select_clause: str = f"COUNT({select.strip().split()[0]}) as {select.strip().split()[1]}" \
+            if is_count else select.strip()
+        sql = f"SELECT {select_clause} FROM {self.__table} {join.strip()} {filtro.strip()} " \
               f"{group.strip()} {orden.strip()} {limit_offset.strip()}"
 
         # El resultado es una lista de  diccionarios, pero hay que transformarlo en modelo de datos
@@ -719,3 +757,26 @@ class BaseDao(object, metaclass=abc.ABCMeta):
                                                                    sql_operation_type=EnumSQLOperationTypes.SELECT_MANY)
 
         return result_as_dict
+
+    def count_rows(self, filters: List[FilterClause] = None, joins: List[JoinClause] = None) -> int:
+        """
+        Cuenta el número de registros en base (opcionalmente) a unos filtros y a unos joins.
+        :param filters: Filtros.
+        :param joins: Cláusulas JOIN.
+        :return: Número de registros encontrados.
+        """
+        # Crear lista de campos con COUNT(*) como único valor
+        fields: List[FieldClause] = [FieldClause(field_name=self.entity_type.get_id_field_name())]
+
+        # RESULTADO: Devuelve una lista de diccionarios
+        select_result: tuple = self.__select_common(fields=fields, filters=filters, joins=joins, is_count=True)
+
+        result_as_dict: List[dict] = select_result[0]
+
+        # Como es una lista de diccionarios, obtengo el primer y único registro, y accedo al campo count(*) para
+        # obtener el número de registros.
+        if result_as_dict is not None and len(result_as_dict) > 0:
+            # Obtener primera clave del diccionario, la cual contiene el recuento
+            return list(result_as_dict[0].values())[0]
+        else:
+            return 0

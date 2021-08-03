@@ -140,6 +140,15 @@ class BaseService(object):
         return self._dao.select(filters=filters, order_by=order_by, fields=fields, group_by=group_by,
                                 joins=joins, offset=offset, limit=limit)
 
+    def count_rows(self, filters: List[FilterClause] = None, joins: List[JoinClause] = None) -> int:
+        """
+        Cuenta el número de registros en base (opcionalmente) a unos filtros y a unos joins.
+        :param filters: Filtros.
+        :param joins: Cláusulas JOIN.
+        :return: Número de registros encontrados.
+        """
+        return self._dao.count_rows(filters=filters, joins=joins)
+
     def select_by_id(self, id_value: any, joins: List[JoinClause] = None, fields: List[FieldClause] = None):
         """
         Devuelve un único registro de acuerdo al id pasado como parámetro. Devuelve None si no lo encuentra.
