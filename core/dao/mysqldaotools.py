@@ -195,8 +195,15 @@ def resolve_field_clause(iteration_object: LoopIterationObject, select_arr: List
         is_last: bool = iteration_object.is_last
 
         # Añadir campo a la SELECT, si no es el último añadir comas
-        select_arr.append(f"{item.table_alias}.{item.field_name} "
-                          f"{item.field_alias if item.field_alias is not None else ''} {('' if is_last else ', ')} ")
+        if item.aggregate_function is not None:
+            # Si es función de agregado, añadirla por delante
+            select_arr.append(f"{item.aggregate_function.function_keyword}({item.table_alias}.{item.field_name}) "
+                              f"{item.field_alias if item.field_alias is not None else ''} "
+                              f"{('' if is_last else ', ')} ")
+        else:
+            select_arr.append(f"{item.table_alias}.{item.field_name} "
+                              f"{item.field_alias if item.field_alias is not None else ''} "
+                              f"{('' if is_last else ', ')} ")
 
 
 def resolve_limit_offset(limit: int, offset: int = None) -> str:

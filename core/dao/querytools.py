@@ -56,6 +56,23 @@ class EnumOperatorTypes(enum.Enum):
     OR = OperatorType(2, 'OR')
 
 
+AggregateFunction = namedtuple('AggregateFunction', ['value', 'function_keyword'])
+"""Tupla para propiedades de EnumAggregateFunctions. La uso para poder añadirle una propiedad al enumerado, 
+aparte del propio valor."""
+
+
+class EnumAggregateFunctions(enum.Enum):
+    """Enumerado de funciones de agregado."""
+
+    @property
+    def function_keyword(self):
+        return self.value.function_keyword
+
+    COUNT = AggregateFunction(1, 'COUNT')
+    MIN = AggregateFunction(2, 'MIN')
+    MAX = AggregateFunction(3, 'MAX')
+
+
 @auto_str
 class FilterClause(object):
     """Clase para modelado de cláusulas WHERE para MySQL."""
@@ -167,7 +184,8 @@ class GroupByClause(object):
 class FieldClause(object):
     """Clase para modelado de campos SELECT para MySQL."""
 
-    def __init__(self, field_name: str, table_alias: str = None, field_alias: str = None, is_lazy_load: bool = False):
+    def __init__(self, field_name: str, table_alias: str = None, field_alias: str = None, is_lazy_load: bool = False,
+                 aggregate_function: (EnumAggregateFunctions, str) = None):
         self.field_name = field_name
         """Nombre del campo SELECT."""
         self.table_alias = table_alias
@@ -177,6 +195,10 @@ class FieldClause(object):
         self.is_lazy_load = is_lazy_load
         """Se utiliza para saber si un campo del SELECT es un lazyload, es decir, se refiere a una entidad anidada 
         pero sólo trae el id, no toda la entidad."""
+        self.aggregate_function = None if aggregate_function is None \
+            else (aggregate_function if isinstance(aggregate_function, EnumAggregateFunctions)
+                  else EnumAggregateFunctions[aggregate_function])
+        """Función de agregado opcional."""
 
 
 class JsonQuery(object):

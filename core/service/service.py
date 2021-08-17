@@ -4,7 +4,7 @@ from typing import Type, Dict, Callable, List
 
 from core.dao.basedao import BaseDao
 from core.dao.querytools import FieldClause, FilterClause, JoinClause, OrderByClause, GroupByClause, EnumFilterTypes, \
-    EnumJoinTypes
+    EnumJoinTypes, EnumAggregateFunctions
 from core.exception.exceptionhandler import BugBarrier
 from core.model.modeldefinition import BaseEntity
 from core.util.noconflict import makecls
@@ -147,7 +147,20 @@ class BaseService(object):
         :param joins: Cláusulas JOIN.
         :return: Número de registros encontrados.
         """
-        return self._dao.count_rows(filters=filters, joins=joins)
+        # Crear lista de campos con COUNT(*) como único valor
+        fields: List[FieldClause] = [FieldClause(field_name=self._dao.entity_type.get_id_field_name(), table_alias=None,
+                                                 field_alias=None, is_lazy_load=False,
+                                                 aggregate_function=EnumAggregateFunctions.COUNT)]
+
+        result: List[dict] = self._dao.select(fields=fields, filters=filters, joins=joins, convert_to_entity=False)
+
+        # Como es una lista de diccionarios, obtengo el primer y único registro, y accedo al campo count(*) para
+        # obtener el número de registros.
+        if result is not None and len(result) > 0:
+            # Obtener primera clave del diccionario, la cual contiene el recuento
+            return list(result[0].values())[0]
+        else:
+            return 0
 
     def select_by_id(self, id_value: any, joins: List[JoinClause] = None, fields: List[FieldClause] = None):
         """
