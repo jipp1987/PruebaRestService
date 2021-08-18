@@ -10,7 +10,7 @@ from core.dao.querytools import JsonQuery
 from core.exception.exceptionhandler import CustomException, catch_exceptions
 from core.model.modeldefinition import BaseEntity
 from core.rest.apitools import EnumPostRequestActions, RequestResponse, \
-    EnumHttpResponseStatusCodes, RequestBody
+    EnumHttpResponseStatusCodes, RequestBody, EnumSelectActions
 from core.service.service import BaseService
 from core.util.i18nutils import translate
 from core.util.jsonutils import encode_object_to_json, decode_object_from_json
@@ -81,10 +81,15 @@ class RestController(flask_restful.Resource):
 
         return translate("i18n_base_common_update_success", None, *[str(entity)])
 
-    def _select_with_response(self, query_object: JsonQuery):
-        """Método para seleccionar datos de una tabla."""
+    def _select_with_response(self, query_object: JsonQuery, select_action: EnumSelectActions = None):
+        """
+        Método para seleccionar datos de una tabla.
+        :param query_object: Objeto query creado desde json.
+        :param select_action: Acción especial de selección.
+        :return:
+        """
         # Hago la consulta, comprobando si es un conteo de filas o una select normal
-        if query_object.is_count:
+        if select_action is not None and select_action == EnumSelectActions.COUNT:
             result: int = self.get_main_service().count_rows(filters=query_object.filters,
                                                              joins=query_object.joins)
         else:
@@ -120,7 +125,7 @@ class RestController(flask_restful.Resource):
         # Luego transformo el string json a un objeto RequestBody, pasando el tipo como parámetro
         request_body: RequestBody = decode_object_from_json(json_format, RequestBody)
         # Resolver acción
-        return self._resolve_action(request_body.action, request_body.request_object)
+        return self._resolve_action(request_body.action, request_body.request_object, request_body.select_action)
 
     def __convert_request_object_to_base_entity(self, request_object: any, is_update: bool = False) -> BaseEntity:
         """
@@ -167,7 +172,7 @@ class RestController(flask_restful.Resource):
         else:
             return result
 
-    def _resolve_action(self, action: int, request_object: any):
+    def _resolve_action(self, action: int, request_object: any, select_action: int = None):
         """
         Método que resuelve la acción a realizar en post a través del RequestBody, en concreto de un int con la acción
         seleccionada. Las implementaciones de RestController que lo necesiten pueden sobrescribir esta función.
@@ -176,6 +181,8 @@ class RestController(flask_restful.Resource):
         2 -> Actualizar
         3 -> Borrar
         4 -> Seleccionar
+        :param request_object Objeto con los datos de la request.
+        :param select_action Entero para acción especial de selección, como por ejemplo un recuento de filas.
         :return: Devuelve bien un mensaje de éxito o error, o si es una select un json con el resultado.
         """
         # Comprobar la acción enviada en la Request
@@ -184,6 +191,8 @@ class RestController(flask_restful.Resource):
         # Si request_action distinto de "select", preparar una BaseEntity
         entity = None
         query_object = None
+
+        # Caso de que no sea una select
         if request_action != EnumPostRequestActions.SELECT:
             entity = self.__convert_request_object_to_base_entity(request_object,
                                                                   request_action == EnumPostRequestActions.UPDATE)
@@ -198,7 +207,11 @@ class RestController(flask_restful.Resource):
         elif request_action == EnumPostRequestActions.UPDATE:
             result = self._update_with_response(entity)
         else:
-            result = self._select_with_response(query_object)
+            # Comprobar si es alguna acción especial de selección, como un recuento de filas por ejemplo
+            special_select_action: EnumSelectActions = EnumSelectActions(select_action) \
+                if select_action is not None else None
+            # Hacer consulta
+            result = self._select_with_response(query_object, special_select_action)
 
         return result
 

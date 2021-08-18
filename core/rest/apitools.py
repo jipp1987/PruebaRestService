@@ -34,6 +34,13 @@ class EnumPostRequestActions(enum.Enum):
     """Seleccionar de una tabla."""
 
 
+class EnumSelectActions(enum.Enum):
+    """Enumerado de acciones especiales de SELECT durante una api request de consulta."""
+
+    COUNT = 1
+    """Recuento de filas."""
+
+
 class EnumHttpResponseStatusCodes(enum.Enum):
     """Enumerado de códigos de estado para respuestas de peticiones Http."""
 
@@ -69,7 +76,7 @@ class RequestBody:
     """Objeto de cuerpo de Request."""
 
     def __init__(self, username: str = None, password: str = None, action: int = None,
-                 request_object: any = None):
+                 select_action: int = None, request_object: any = None):
         super().__init__()
         self.username = username
         """Nombre de usuario para token de autenticación."""
@@ -77,6 +84,9 @@ class RequestBody:
         """Password de usuario para token de autenticación."""
         self.action = action
         """Acción a realizar."""
+        self.select_action = select_action
+        """Acción especial de select, por ejemplo un recuento de líneas. Se es None y action es select, 
+        sería una consulta normal."""
         self.request_object = request_object
         """Objeto de la request. Puede ser un BaseEntity, una lista de filtros..."""
 

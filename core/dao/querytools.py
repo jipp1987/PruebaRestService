@@ -215,7 +215,6 @@ class JsonQuery(object):
         self.__fields = None
         self.__offset = None
         self.__limit = None
-        self.__is_count = False
 
         # Recorrer diccionario estableciendo valores
         for a, b in d.items():
@@ -305,13 +304,3 @@ class JsonQuery(object):
     def limit(self, limit):
         if isinstance(limit, int):
             self.__limit = limit
-
-    @property
-    def is_count(self) -> bool:
-        """Es un select count."""
-        return self.__is_count
-
-    @is_count.setter
-    def is_count(self, is_count):
-        if isinstance(is_count, bool):
-            self.__is_count = is_count
