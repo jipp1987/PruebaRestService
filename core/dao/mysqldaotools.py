@@ -94,6 +94,12 @@ def resolve_filter_clause(iteration_object: LoopIterationObject, filtro_arr: Lis
         if item.filter_type == EnumFilterTypes.LIKE or item.filter_type == EnumFilterTypes.NOT_LIKE:
             # Filtro LIKE: poner comodín % al principio y al final
             compare = f"%{item.object_to_compare}%"
+        elif item.filter_type == EnumFilterTypes.STARTS_WITH:
+            # Filtro LIKE: poner comodín % al final
+            compare = f"{item.object_to_compare}%"
+        elif item.filter_type == EnumFilterTypes.ENDS_WITH:
+            # Filtro LIKE: poner comodín % al principio
+            compare = f"%{item.object_to_compare}"
         elif item.filter_type == EnumFilterTypes.IN or item.filter_type == EnumFilterTypes.NOT_IN:
             # Filtro IN y NOT IN: el objeto a comparar es una lista, concatenar los elementos por comas
             if len(item.object_to_compare) > 1:

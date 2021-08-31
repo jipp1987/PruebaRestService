@@ -38,6 +38,8 @@ class EnumFilterTypes(enum.Enum):
     GREATER_THAN = FilterType(9, '>')
     GREATER_THAN_OR_EQUALS = FilterType(10, '>=')
     BETWEEN = FilterType(11, 'BETWEEN')
+    STARTS_WITH = FilterType(12, 'LIKE')
+    ENDS_WITH = FilterType(13, 'LIKE')
 
 
 OperatorType = namedtuple('OperatorType', ['value', 'operator_keyword'])
