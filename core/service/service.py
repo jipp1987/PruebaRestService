@@ -10,6 +10,22 @@ from core.model.modeldefinition import BaseEntity
 from core.util.noconflict import makecls
 
 
+def service_function(function):
+    """Utilizo este decorador para establecer un método de BaseService como método de transacción
+    en la base de datos."""
+
+    def wrapped(*args, **kwargs):
+        # Esta parte sería para añadir alguna lógica en la función, pero no es el caso. Realmente la quiero devolver
+        # como tal pero con un atributo a mayores para saber que le he añadido un decorador "service_function_dec". Lo
+        # utilizo para saber qué funciones deben iniciar transacciones de base de datos y hacer rollback en caso de
+        # error.
+        pass
+
+    # Le puedo añadir a cualquier función un atributo al vuelo, así que le añado uno para saber que tiene etiqueta
+    function.is_service_method = True
+    return function
+
+
 class BaseService(object):
     """
     Clase abstract de la que han de heredar el resto de servicios del programa.
@@ -31,8 +47,10 @@ class BaseService(object):
         # Obtengo los atributos de la clase usando la función de la superclase object
         attr = object.__getattribute__(self, name)
 
-        # Con esto compruebo que sea un método público
-        if isinstance(attr, types.MethodType) and not name.startswith('_'):
+        # Compruebo si el atributo es un método (una función de la clase, con parámetro "self"). También compruebo
+        # si tiene un atributo llamado "is_service_method", lo cual significa que le he aplicado el decorador
+        # "service_function_dec".
+        if isinstance(attr, types.MethodType) and getattr(attr, 'is_service_method', False):
             # Creo una nueva función, que en realidad es la misma pero "envuelta" en la función de iniciar transacción
             def transaction_func(*args, **kwargs):
                 result = self.__start_transaction(attr, *args, **kwargs)
@@ -95,6 +113,7 @@ class BaseService(object):
             if i_had_to_connect:
                 self._dao.disconnect()
 
+    @service_function
     def insert(self, entity: BaseEntity):
         """
         Inserta un registro en la base de datos.
@@ -103,6 +122,7 @@ class BaseService(object):
         """
         self._dao.insert(entity)
 
+    @service_function
     def update(self, entity: BaseEntity):
         """
         Actualiza un registro en la base de datos.
@@ -111,6 +131,7 @@ class BaseService(object):
         """
         self._dao.update(entity)
 
+    @service_function
     def delete_entity(self, entity: BaseEntity):
         """
         Elimina un registro en la base de datos.
@@ -119,6 +140,7 @@ class BaseService(object):
         """
         self._dao.delete_entity(entity)
 
+    @service_function
     def select(self, fields: List[FieldClause] = None, filters: List[FilterClause] = None,
                order_by: List[OrderByClause] = None, joins: List[JoinClause] = None,
                group_by: List[GroupByClause] = None,
@@ -140,6 +162,7 @@ class BaseService(object):
         return self._dao.select(filters=filters, order_by=order_by, fields=fields, group_by=group_by,
                                 joins=joins, offset=offset, limit=limit)
 
+    @service_function
     def count_rows(self, filters: List[FilterClause] = None, joins: List[JoinClause] = None) -> int:
         """
         Cuenta el número de registros en base (opcionalmente) a unos filtros y a unos joins.
@@ -162,6 +185,7 @@ class BaseService(object):
         else:
             return 0
 
+    @service_function
     def select_by_id(self, id_value: any, joins: List[JoinClause] = None, fields: List[FieldClause] = None):
         """
         Devuelve un único registro de acuerdo al id pasado como parámetro. Devuelve None si no lo encuentra.

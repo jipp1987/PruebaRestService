@@ -1,7 +1,7 @@
 from typing import List
 
 from core.dao.querytools import FilterClause, EnumFilterTypes, FieldClause
-from core.service.service import BaseService
+from core.service.service import BaseService, service_function
 from core.util.passwordutils import hash_password_using_bcrypt, check_password_using_bcrypt
 from impl.dao.daoimpl import TipoClienteDao, ClienteDao, UsuarioDao
 from impl.model.usuario import Usuario
@@ -33,6 +33,7 @@ class UsuarioService(BaseService):
         # de esta forma llamo al constructor del padre
         super().__init__(dao=UsuarioDao())
 
+    @service_function
     def check_password(self, usuario: Usuario):
         """
         Comprueba y establece el valor encriptado del password del usuario si es necesario.
@@ -65,11 +66,13 @@ class UsuarioService(BaseService):
                             # pero está desencriptado)
                             usuario.password = usuario_old.password
 
+    @service_function
     def insert(self, entity: Usuario):
         # Sobrescritura de insert para comprobar password
         self.check_password(entity)
         super().insert(entity)
 
+    @service_function
     def update(self, entity: Usuario):
         # Sobrescritura de update para comprobar password
         self.check_password(entity)
